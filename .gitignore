@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Local Database Data
+mysql_data/
+**/mysql_data/
+*.sock
+*.pid
+
+# Build Outputs & Cache
+dist/
+**/dist/
+build/
+**/build/
+.gradle/
+**/.gradle/
+.idea/
+**/.idea/
+*.iml
+.DS_Store
+**/.DS_Store
+
+# Environment Variables
+.env
+.env.local
+**/.env
+**/.env.local
+
+# Vercel & Deployment
+.vercel/
+**/.vercel/
+
+# Android Keystore & Private Keys
+*.jks
+*.keystore
+local.properties
+**/local.properties

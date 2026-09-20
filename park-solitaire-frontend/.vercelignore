@@ -1,0 +1,11 @@
+node_modules
+android
+dist
+.gradle
+.idea
+build
+*.jks
+*.aab
+*.apk
+*.zip
+.git

@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: park_solitaire_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: parksolitaire
+      MYSQL_DATABASE: park_solitaire
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pparksolitaire"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./park-solitaire-backend
+      dockerfile: Dockerfile
+    container_name: park_solitaire_backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "5001:5001"
+    environment:
+      NODE_ENV: production
+      PORT: 5001
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: parksolitaire
+      DB_NAME: park_solitaire
+      JWT_SECRET: production_jwt_secret_key_change_me_in_prod
+      CLIENT_ORIGIN: "http://localhost"
+    command: >
+      sh -c "npm run db:init && npm run db:seed && npm start"
+
+  frontend:
+    build:
+      context: ./park-solitaire-frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: "http://localhost:5001/api"
+    container_name: park_solitaire_frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  db_data:

@@ -1,0 +1,19 @@
+{
+  "appId": "com.parksolitaire.crm",
+  "appName": "Park Solitaire",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": true
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css"
+    }
+  }
+}

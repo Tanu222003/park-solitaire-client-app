@@ -1,0 +1,14 @@
+**/node_modules
+**/mysql_data
+**/android
+**/dist
+**/.gradle
+**/.idea
+**/build
+*.jks
+*.aab
+*.apk
+*.zip
+.git
+release-bundle
+park-solitaire-backend
