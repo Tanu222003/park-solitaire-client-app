@@ -8,11 +8,11 @@ dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const DB_HOST = process.env.DB_HOST || 'localhost';
-const DB_PORT = Number(process.env.DB_PORT) || 3306;
-const DB_USER = process.env.DB_USER || 'root';
-const DB_PASSWORD = process.env.DB_PASSWORD || '';
-const DB_NAME = process.env.DB_NAME || 'park_solitaire';
+const DB_HOST = process.env.DB_HOST || process.env.MYSQLHOST || 'localhost';
+const DB_PORT = Number(process.env.DB_PORT || process.env.MYSQLPORT) || 3306;
+const DB_USER = process.env.DB_USER || process.env.MYSQLUSER || 'root';
+const DB_PASSWORD = process.env.DB_PASSWORD || process.env.MYSQLPASSWORD || '';
+const DB_NAME = process.env.DB_NAME || process.env.MYSQLDATABASE || 'park_solitaire';
 
 const pool = mysql.createPool({
   host: DB_HOST,
