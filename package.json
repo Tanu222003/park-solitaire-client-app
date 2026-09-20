@@ -1,0 +1,7 @@
+{
+  "name": "park-solitaire-crm",
+  "private": true,
+  "scripts": {
+    "build": "cd park-solitaire-frontend && npm install && npm run build"
+  }
+}

@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "cd park-solitaire-frontend && npm install",
   "buildCommand": "cd park-solitaire-frontend && npm run build",
   "outputDirectory": "park-solitaire-frontend/dist",
   "framework": "vite",
