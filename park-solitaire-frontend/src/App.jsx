@@ -5,7 +5,8 @@ import {
   CircleDollarSign, ClipboardList, Edit, FileWarning, Home, Lock,
   LogIn, LogOut, Menu, MessageSquare, MoreHorizontal, Plus, Search,
   Send, Settings, Users, X, Phone, Mail, MapPin, Building, Tag,
-  UserCheck, ShieldAlert, Clock
+  UserCheck, ShieldAlert, Clock, FileText, Landmark, CreditCard,
+  BarChart2, TrendingUp
 } from 'lucide-react';
 import { api, getServerUrl, setServerUrl } from './api';
 
@@ -890,56 +891,64 @@ function Shell({ children }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Real-Time Server-Sent Events (SSE) stream listener + heartbeat fallback
+  // Real-Time Server-Sent Events (SSE) stream listener + cross-tab storage sync
   useEffect(() => {
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
-    const eventsUrl = `${apiUrl}/events`;
+    const apiUrl = getServerUrl();
+    const eventsUrl = apiUrl ? `${apiUrl}/events` : '';
     let eventSource = null;
 
-    try {
-      eventSource = new EventSource(eventsUrl);
-      eventSource.onmessage = (e) => {
-        try {
-          const payload = JSON.parse(e.data);
-          if (payload && payload.type && payload.type !== 'CONNECTED') {
-            const dataObj = payload.payload || payload.data || {};
-            const targetPartnerId = dataObj.targetPartnerId;
+    if (eventsUrl) {
+      try {
+        eventSource = new EventSource(eventsUrl);
+        eventSource.onmessage = (e) => {
+          try {
+            const payload = JSON.parse(e.data);
+            if (payload && payload.type && payload.type !== 'CONNECTED') {
+              const dataObj = payload.payload || payload.data || {};
+              const targetPartnerId = dataObj.targetPartnerId;
 
-            // Channel Partner targeting privacy:
-            // If logged in as partner, and this event has a targeted partner ID,
-            // ONLY display toast and refresh if current user matches targetPartnerId!
-            if (user.role === 'partner' && targetPartnerId && Number(user.id) !== Number(targetPartnerId)) {
-              return; // Do NOT reflect to other channel partners
+              // Channel Partner targeting privacy:
+              if (user.role === 'partner' && targetPartnerId && Number(user.id) !== Number(targetPartnerId)) {
+                return; // Do NOT reflect to other channel partners
+              }
+
+              const id = Date.now() + Math.random();
+              let category = 'visit';
+              if (payload.type.includes('CLIENT')) category = 'client';
+              if (payload.type.includes('COMPLAINT')) category = 'complaint';
+              if (payload.type.includes('PAYMENT')) category = 'payment';
+
+              const newToast = {
+                id,
+                type: category,
+                title: payload.type.replace(/_/g, ' '),
+                message: payload.message || payload.data?.message || payload.payload?.message || 'Real-time update received from server',
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              };
+
+              setToasts((prev) => [newToast, ...prev.slice(0, 3)]);
+              setTimeout(() => {
+                setToasts((prev) => prev.filter((t) => t.id !== id));
+              }, 6000);
+
+              // Broadcast custom event so active views refresh immediately without page reload
+              window.dispatchEvent(new CustomEvent('portal-refresh', { detail: payload }));
             }
+          } catch (err) {}
+        };
+        eventSource.onerror = () => {
+          // SSE natively auto-reconnects
+        };
+      } catch (err) {}
+    }
 
-            const id = Date.now() + Math.random();
-            let category = 'visit';
-            if (payload.type.includes('CLIENT')) category = 'client';
-            if (payload.type.includes('COMPLAINT')) category = 'complaint';
-            if (payload.type.includes('PAYMENT')) category = 'payment';
-
-            const newToast = {
-              id,
-              type: category,
-              title: payload.type.replace(/_/g, ' '),
-              message: payload.message || payload.data?.message || payload.payload?.message || 'Real-time update received from server',
-              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            };
-
-            setToasts((prev) => [newToast, ...prev.slice(0, 3)]);
-            setTimeout(() => {
-              setToasts((prev) => prev.filter((t) => t.id !== id));
-            }, 6000);
-
-            // Broadcast custom event so active views refresh immediately without page reload
-            window.dispatchEvent(new CustomEvent('portal-refresh', { detail: payload }));
-          }
-        } catch (err) {}
-      };
-      eventSource.onerror = () => {
-        // SSE natively auto-reconnects
-      };
-    } catch (err) {}
+    // Cross-tab synchronization (e.g. CP in one window schedules visit, Admin in another updates instantly)
+    const handleStorageChange = (e) => {
+      if (e.key === 'ps_demo_store' || e.key === 'token') {
+        window.dispatchEvent(new CustomEvent('portal-refresh', { detail: { type: 'STORAGE_UPDATE' } }));
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
 
     // Fallback heartbeat polling interval (6s)
     const interval = setInterval(() => {
@@ -948,6 +957,7 @@ function Shell({ children }) {
 
     return () => {
       if (eventSource) eventSource.close();
+      window.removeEventListener('storage', handleStorageChange);
       clearInterval(interval);
     };
   }, []);
@@ -1074,7 +1084,7 @@ function getVisitDayClassification(visitDate) {
   const pad = (n) => String(n).padStart(2, '0');
   const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 
-  const tmrw = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const tmrw = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   const tomorrowStr = `${tmrw.getFullYear()}-${pad(tmrw.getMonth() + 1)}-${pad(tmrw.getDate())}`;
 
   const rawStr = String(visitDate).trim();
@@ -1087,12 +1097,17 @@ function getVisitDayClassification(visitDate) {
     return { isToday: false, isTomorrow: true, formattedDate: 'Tomorrow' };
   }
 
-  // Also check standard date parsing in local timezone
+  // Parse via Date object in local and UTC timezones
   const d = new Date(visitDate);
   if (!isNaN(d.getTime())) {
     const localStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     if (localStr === todayStr) return { isToday: true, isTomorrow: false, formattedDate: 'Today' };
     if (localStr === tomorrowStr) return { isToday: false, isTomorrow: true, formattedDate: 'Tomorrow' };
+
+    const utcStr = `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+    if (utcStr === todayStr) return { isToday: true, isTomorrow: false, formattedDate: 'Today' };
+    if (utcStr === tomorrowStr) return { isToday: false, isTomorrow: true, formattedDate: 'Tomorrow' };
+
     return {
       isToday: false,
       isTomorrow: false,
@@ -1100,7 +1115,7 @@ function getVisitDayClassification(visitDate) {
     };
   }
 
-  return { isToday: false, isTomorrow: false, formattedDate: '' };
+  return { isToday: false, isTomorrow: false, formattedDate: datePrefix };
 }
 
 function ClientVisitsWidget({
@@ -1116,10 +1131,10 @@ function ClientVisitsWidget({
 
   const todayVisits = visits.filter((v) => getVisitDayClassification(v.visit_date).isToday);
   const tomorrowVisits = visits.filter((v) => getVisitDayClassification(v.visit_date).isTomorrow);
-  const currentList = activeTab === 'today' ? todayVisits : tomorrowVisits;
+  const currentList = activeTab === 'today' ? todayVisits : (activeTab === 'tomorrow' ? tomorrowVisits : visits);
 
   const now = new Date();
-  const tmrw = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const tmrw = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   const todayDateFormatted = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   const tomorrowDateFormatted = tmrw.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 
@@ -1133,29 +1148,31 @@ function ClientVisitsWidget({
               <span className="live-dot" /> Live Schedule
             </span>
             <span className="visits-summary-pill">
-              <strong>{todayVisits.length}</strong> Today ({todayDateFormatted}) • <strong>{tomorrowVisits.length}</strong> Tomorrow ({tomorrowDateFormatted})
+              <strong>{todayVisits.length}</strong> Today ({todayDateFormatted}) • <strong>{tomorrowVisits.length}</strong> Tomorrow ({tomorrowDateFormatted}) • <strong>{visits.length}</strong> Total Visits
             </span>
           </div>
-          <h3 className="upcoming-visits-title">Today &amp; Tomorrow Client Visits</h3>
+          <h3 className="upcoming-visits-title">Site Visits Schedule &amp; Activity</h3>
         </div>
 
         <div className="upcoming-visits-actions">
-          <button
-            type="button"
-            className="btn-quick-schedule"
-            onClick={() => onOpenSchedule(activeTab)}
-            title="Schedule a visit for today or tomorrow"
-          >
-            <Plus size={15} />
-            <span>Schedule Visit</span>
-          </button>
+          {admin && (
+            <button
+              type="button"
+              className="btn-quick-schedule"
+              onClick={() => onOpenSchedule(activeTab === 'all' ? 'today' : activeTab)}
+              title="Schedule a visit"
+            >
+              <Plus size={15} />
+              <span>Schedule Visit</span>
+            </button>
+          )}
           <Link to={`${prefix}/visits`} className="view-all-link">
             All Visits ({visits.length})
           </Link>
         </div>
       </div>
 
-      {/* Tab toggle: Today vs Tomorrow */}
+      {/* Tab toggle: Today vs Tomorrow vs All */}
       <div className="visit-tab-toggle-bar">
         <button
           type="button"
@@ -1180,6 +1197,18 @@ function ClientVisitsWidget({
             {tomorrowVisits.length}
           </span>
         </button>
+
+        <button
+          type="button"
+          className={`visit-tab-btn ${activeTab === 'all' ? 'active' : ''}`}
+          onClick={() => setActiveTab('all')}
+        >
+          <CalendarDays size={15} />
+          <span>All Scheduled Visits</span>
+          <span className="visit-tab-count">
+            {visits.length}
+          </span>
+        </button>
       </div>
 
       {/* Visits List */}
@@ -1189,26 +1218,39 @@ function ClientVisitsWidget({
             <div className="empty-icon-circle">
               <CalendarDays size={26} />
             </div>
-            <h4>No visits scheduled for {activeTab === 'today' ? `Today (${todayDateFormatted})` : `Tomorrow (${tomorrowDateFormatted})`}</h4>
+            <h4>
+              {activeTab === 'today'
+                ? `No visits scheduled for Today (${todayDateFormatted})`
+                : activeTab === 'tomorrow'
+                ? `No visits scheduled for Tomorrow (${tomorrowDateFormatted})`
+                : 'No visits scheduled yet in the system'}
+            </h4>
             <p>
               {activeTab === 'today'
-                ? 'No client visits are booked for today yet. Schedule site visits with interested buyers.'
-                : 'No client visits booked for tomorrow yet. Lock in appointments in advance.'}
+                ? 'No client visits are booked for today yet.'
+                : activeTab === 'tomorrow'
+                ? 'No client visits booked for tomorrow yet.'
+                : 'No site visits recorded in the system yet.'}
             </p>
-            <button
-              type="button"
-              className="btn-primary-compact"
-              onClick={() => onOpenSchedule(activeTab)}
-            >
-              <Plus size={14} /> Schedule {activeTab === 'today' ? "Today's" : "Tomorrow's"} Visit
-            </button>
+            {admin && (
+              <button
+                type="button"
+                className="btn-primary-compact"
+                onClick={() => onOpenSchedule(activeTab === 'all' ? 'today' : activeTab)}
+              >
+                <Plus size={14} /> Schedule {activeTab === 'today' ? "Today's" : activeTab === 'tomorrow' ? "Tomorrow's" : "New"} Visit
+              </button>
+            )}
           </div>
         ) : (
           currentList.map((v) => {
             const cleanPhone = v.client_phone ? v.client_phone.replace(/[^0-9+]/g, '') : '';
+            const dayClassification = getVisitDayClassification(v.visit_date);
+            const displayDay = dayClassification.formattedDate || (activeTab === 'today' ? 'Today' : activeTab === 'tomorrow' ? 'Tomorrow' : 'Scheduled');
+
             return (
               <div
-                className={`visit-update-card ${v.status === 'completed' ? 'is-completed' : ''}`}
+                className={`visit-update-card ${(v.status || '').toLowerCase() === 'booked' || (v.status || '').toLowerCase() === 'closed' ? 'is-completed' : ''}`}
                 key={v.id}
               >
                 <div className="visit-card-top-row">
@@ -1216,25 +1258,27 @@ function ClientVisitsWidget({
                     <Clock size={13} />
                     <strong>{v.visit_time || '11:00 AM'}</strong>
                     <span className="visit-day-label">
-                      {activeTab === 'today' ? 'Today' : 'Tomorrow'}
+                      {displayDay}
                     </span>
                   </div>
 
                   <div className="visit-status-controls">
-                    <span className={`visit-status-pill status-${v.status || 'scheduled'}`}>
-                      {v.status === 'completed' && <CheckCircle2 size={12} />}
-                      {v.status ? v.status.charAt(0).toUpperCase() + v.status.slice(1) : 'Scheduled'}
+                    <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
+                      {v.status || 'Upcoming'}
                     </span>
 
-                    {v.status !== 'completed' && (
-                      <button
-                        type="button"
-                        className="btn-quick-complete"
-                        onClick={() => onUpdateStatus(v.id, 'completed')}
-                        title="Mark visit as completed in database"
+                    {admin && (
+                      <select
+                        className="status-dropdown"
+                        value={v.status || 'Upcoming'}
+                        onChange={(e) => onUpdateStatus(v.id, e.target.value)}
+                        style={{ fontSize: '11px', padding: '2px 6px' }}
+                        title="Update visit status in MySQL"
                       >
-                        <Check size={12} /> Mark Done
-                      </button>
+                        {['Upcoming', 'Visited', 'FollowUp', 'Revisited', 'Booked', 'Closed'].map((st) => (
+                          <option key={st} value={st}>{st}</option>
+                        ))}
+                      </select>
                     )}
                   </div>
                 </div>
@@ -1266,7 +1310,15 @@ function ClientVisitsWidget({
                   {admin && (v.partner_name || v.partner_firm_name) && (
                     <div
                       className="visit-partner-row clickable"
-                      onClick={() => openUserDetails(v)}
+                      onClick={() => openUserDetails({
+                        id: v.partner_id,
+                        name: v.partner_name,
+                        firm_name: v.partner_firm_name,
+                        email: v.partner_email,
+                        phone: v.partner_phone,
+                        phone2: v.partner_phone2,
+                        role: 'partner'
+                      })}
                       title="Click to view Channel Partner phone & details"
                     >
                       <Building size={13} />
@@ -1361,7 +1413,7 @@ function Dashboard({ admin = false }) {
     visit_date: '',
     visit_time: '11:00 AM',
     notes: '',
-    status: 'scheduled'
+    status: 'Upcoming'
   });
   const prefix = admin ? '/admin' : '/partner';
 
@@ -1404,6 +1456,7 @@ function Dashboard({ admin = false }) {
   const tomorrowStr = `${tomorrowObj.getFullYear()}-${pad(tomorrowObj.getMonth() + 1)}-${pad(tomorrowObj.getDate())}`;
 
   const openScheduleModal = (presetDay = 'today') => {
+    if (!admin) return;
     const targetDate = presetDay === 'tomorrow' ? tomorrowStr : todayStr;
 
     // Refresh client list if empty
@@ -1424,7 +1477,7 @@ function Dashboard({ admin = false }) {
       visit_date: targetDate,
       visit_time: '11:00 AM',
       notes: '',
-      status: 'scheduled'
+      status: 'Upcoming'
     });
     setShowScheduleModal(true);
   };
@@ -1446,7 +1499,7 @@ function Dashboard({ admin = false }) {
         visit_date: newVisit.visit_date,
         visit_time: newVisit.visit_time || '11:00 AM',
         notes: newVisit.notes || '',
-        status: newVisit.status || 'scheduled'
+        status: newVisit.status || 'Upcoming'
       });
       setShowScheduleModal(false);
       setToast('Visit successfully scheduled & saved to MySQL!');
@@ -1516,7 +1569,7 @@ function Dashboard({ admin = false }) {
         </div>
       )}
 
-      {showScheduleModal && (
+      {admin && showScheduleModal && (
         <div className="modal-overlay" onClick={() => setShowScheduleModal(false)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
@@ -1598,9 +1651,12 @@ function Dashboard({ admin = false }) {
                     value={newVisit.status}
                     onChange={(e) => setNewVisit({ ...newVisit, status: e.target.value })}
                   >
-                    <option value="scheduled">Scheduled</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
+                    <option value="Upcoming">Upcoming</option>
+                    <option value="Visited">Visited</option>
+                    <option value="FollowUp">FollowUp</option>
+                    <option value="Revisited">Revisited</option>
+                    <option value="Booked">Booked</option>
+                    <option value="Closed">Closed</option>
                   </select>
                 </div>
 
@@ -1807,7 +1863,7 @@ function Dashboard({ admin = false }) {
             prefix={prefix}
             openUserDetails={openUserDetails}
             onUpdateStatus={handleUpdateVisitStatus}
-            onOpenSchedule={openScheduleModal}
+            onOpenSchedule={undefined}
           />
 
           {/* Recent Activities Section (Figma Screen 5) */}
@@ -1854,10 +1910,9 @@ function Clients() {
     phone: '',
     email: '',
     address: '',
-    unit_type: '2 BHK',
+    unit_type: '1 BHK',
     budget: '₹ 50L - 70L',
-    source: 'Referral',
-    status: 'Pending',
+    status: 'Upcoming Visit',
     visit_date: '',
     visit_time: '',
     visit_notes: ''
@@ -1933,7 +1988,7 @@ function Clients() {
       </div>
 
       <div className="filter-pills-row">
-        {['All', 'Visited', 'Pending', 'Booked'].map((st) => (
+        {['All', 'Upcoming Visit', 'Closed', 'Site Visit Planned'].map((st) => (
           <button
             key={st}
             type="button"
@@ -2006,7 +2061,9 @@ function Clients() {
                 <div>
                   <h3 style={{ margin: 0, fontSize: '17px' }}>Add New Client</h3>
                   <small style={{ color: '#6b7c77', fontSize: '11px', display: 'block', marginTop: '2px' }}>
-                    Register client profile & optionally schedule their property visit
+                    {isAdmin
+                      ? 'Register client profile & optionally schedule their property visit'
+                      : 'Register client profile with unit requirement and contact details'}
                   </small>
                 </div>
               </div>
@@ -2054,12 +2111,16 @@ function Clients() {
                   </div>
 
                   <div className="form-field">
-                    <label>Unit Requirement</label>
-                    <input
+                    <label>Unit Requirement *</label>
+                    <select
+                      required
                       value={newClient.unit_type}
                       onChange={(e) => setNewClient({ ...newClient, unit_type: e.target.value })}
-                      placeholder="e.g. 2 BHK, 3 BHK, Penthouse"
-                    />
+                    >
+                      <option value="1 BHK">1 BHK</option>
+                      <option value="2 BHK">2 BHK</option>
+                      <option value="3 BHK">3 BHK</option>
+                    </select>
                   </div>
 
                   <div className="form-field">
@@ -2072,34 +2133,18 @@ function Clients() {
                   </div>
 
                   <div className="form-field">
-                    <label>Lead Source</label>
-                    <select
-                      value={newClient.source}
-                      onChange={(e) => setNewClient({ ...newClient, source: e.target.value })}
-                    >
-                      <option value="Referral">Referral</option>
-                      <option value="Walk-in">Walk-in</option>
-                      <option value="Website">Website</option>
-                      <option value="Campaign">Marketing Campaign</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-
-                  <div className="form-field">
                     <label>Pipeline Status</label>
                     <select
                       value={newClient.status}
                       onChange={(e) => setNewClient({ ...newClient, status: e.target.value })}
                     >
-                      <option value="Pending">Pending</option>
-                      <option value="Site Visit Planned">Site Visit Planned</option>
-                      <option value="Visited">Visited</option>
+                      <option value="Upcoming Visit">Upcoming Visit</option>
                       <option value="Closed">Closed</option>
                     </select>
                   </div>
 
                   <div className="form-field full-col">
-                    <label>Full Address / Location</label>
+                    <label>Address</label>
                     <textarea
                       rows={2}
                       value={newClient.address}
@@ -2109,119 +2154,121 @@ function Clients() {
                   </div>
                 </div>
 
-                {/* Section 2: Optional Site Visit Scheduling */}
-                <div className="client-visit-schedule-section">
-                  <div className="visit-schedule-header">
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <CalendarDays size={16} style={{ color: '#166534' }} />
-                        <strong>Schedule Site Visit (Date & Time)</strong>
+                {/* Section 2: Optional Site Visit Scheduling (Admin Only) */}
+                {isAdmin && (
+                  <div className="client-visit-schedule-section">
+                    <div className="visit-schedule-header">
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <CalendarDays size={16} style={{ color: '#166534' }} />
+                          <strong>Schedule Site Visit (Date & Time)</strong>
+                        </div>
+                        <span className="optional-tag">Optional</span>
                       </div>
-                      <span className="optional-tag">Optional</span>
+                      <small>
+                        Specify when this client will visit. If scheduled for tomorrow, it will alert Admin and appear on Tomorrow's Visit Radar instantly!
+                      </small>
                     </div>
-                    <small>
-                      Specify when this client will visit. If scheduled for tomorrow, it will alert Admin and appear on Tomorrow's Visit Radar instantly!
-                    </small>
-                  </div>
 
-                  <div className="visit-date-quick-chips">
-                    <button
-                      type="button"
-                      className={`chip ${newClient.visit_date === todayStr ? 'active' : ''}`}
-                      onClick={() => setNewClient({ ...newClient, visit_date: todayStr, status: 'Site Visit Planned' })}
-                    >
-                      📅 Today
-                    </button>
-                    <button
-                      type="button"
-                      className={`chip ${newClient.visit_date === tomorrowStr ? 'active' : ''}`}
-                      onClick={() => setNewClient({ ...newClient, visit_date: tomorrowStr, status: 'Site Visit Planned' })}
-                    >
-                      ⚡ Tomorrow
-                    </button>
-                    <button
-                      type="button"
-                      className={`chip ${newClient.visit_date === dayAfterStr ? 'active' : ''}`}
-                      onClick={() => setNewClient({ ...newClient, visit_date: dayAfterStr, status: 'Site Visit Planned' })}
-                    >
-                      🗓️ In 2 Days
-                    </button>
-                    {newClient.visit_date && (
+                    <div className="visit-date-quick-chips">
                       <button
                         type="button"
-                        className="chip clear-chip"
-                        onClick={() => setNewClient({ ...newClient, visit_date: '', visit_time: '', visit_notes: '' })}
+                        className={`chip ${newClient.visit_date === todayStr ? 'active' : ''}`}
+                        onClick={() => setNewClient({ ...newClient, visit_date: todayStr, status: 'Upcoming Visit' })}
                       >
-                        ✕ Clear Visit
+                        📅 Today
                       </button>
-                    )}
-                  </div>
-
-                  <div className="form-grid-2" style={{ marginBottom: '10px' }}>
-                    <div className="form-field">
-                      <label style={{ fontSize: '11px', fontWeight: '600', color: '#166534' }}>Visit Date</label>
-                      <input
-                        type="date"
-                        min={todayStr}
-                        value={newClient.visit_date}
-                        onChange={(e) => setNewClient({
-                          ...newClient,
-                          visit_date: e.target.value,
-                          status: e.target.value ? 'Site Visit Planned' : newClient.status
-                        })}
-                      />
-                    </div>
-                    <div className="form-field">
-                      <label style={{ fontSize: '11px', fontWeight: '600', color: '#166534' }}>Visit Time</label>
-                      <input
-                        type="time"
-                        value={newClient.visit_time}
-                        onChange={(e) => setNewClient({ ...newClient, visit_time: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="time-presets-row">
-                    <span className="time-preset-label">Quick Times:</span>
-                    {['10:30', '11:30', '14:00', '16:00', '17:30'].map((t) => (
                       <button
-                        key={t}
                         type="button"
-                        className={`time-preset-btn ${newClient.visit_time === t ? 'active' : ''}`}
-                        onClick={() => setNewClient({ ...newClient, visit_time: t })}
+                        className={`chip ${newClient.visit_date === tomorrowStr ? 'active' : ''}`}
+                        onClick={() => setNewClient({ ...newClient, visit_date: tomorrowStr, status: 'Upcoming Visit' })}
                       >
-                        {t === '10:30' ? '10:30 AM' : t === '11:30' ? '11:30 AM' : t === '14:00' ? '02:00 PM' : t === '16:00' ? '04:00 PM' : '05:30 PM'}
+                        ⚡ Tomorrow
                       </button>
-                    ))}
-                  </div>
-
-                  {newClient.visit_date && (
-                    <div className={`visit-scheduled-live-hint ${newClient.visit_date === tomorrowStr ? 'tomorrow' : ''}`}>
-                      {newClient.visit_date === tomorrowStr ? (
-                        <span>
-                          📢 <strong>Tomorrow Radar Alert:</strong> This client will automatically appear on <strong>Tomorrow's Upcoming Visits</strong> radar with complete dossier and alert Admin in real time!
-                        </span>
-                      ) : newClient.visit_date === todayStr ? (
-                        <span>
-                          🟢 <strong>Today's Live Radar:</strong> This visit will immediately appear under <strong>Today's Scheduled Visits</strong> with 1-click completion.
-                        </span>
-                      ) : (
-                        <span>
-                          🗓️ <strong>Scheduled Visit:</strong> Appointment recorded for <strong>{newClient.visit_date}</strong> {newClient.visit_time ? `at ${newClient.visit_time}` : ''}.
-                        </span>
+                      <button
+                        type="button"
+                        className={`chip ${newClient.visit_date === dayAfterStr ? 'active' : ''}`}
+                        onClick={() => setNewClient({ ...newClient, visit_date: dayAfterStr, status: 'Upcoming Visit' })}
+                      >
+                        🗓️ In 2 Days
+                      </button>
+                      {newClient.visit_date && (
+                        <button
+                          type="button"
+                          className="chip clear-chip"
+                          onClick={() => setNewClient({ ...newClient, visit_date: '', visit_time: '', visit_notes: '' })}
+                        >
+                          ✕ Clear Visit
+                        </button>
                       )}
                     </div>
-                  )}
 
-                  <div className="form-field">
-                    <label style={{ fontSize: '11px', fontWeight: '600', color: '#166534' }}>Visit Notes / Remarks</label>
-                    <input
-                      value={newClient.visit_notes}
-                      onChange={(e) => setNewClient({ ...newClient, visit_notes: e.target.value })}
-                      placeholder="e.g. Interested in 3 BHK Sample Flat tour"
-                    />
+                    <div className="form-grid-2" style={{ marginBottom: '10px' }}>
+                      <div className="form-field">
+                        <label style={{ fontSize: '11px', fontWeight: '600', color: '#166534' }}>Visit Date</label>
+                        <input
+                          type="date"
+                          min={todayStr}
+                          value={newClient.visit_date}
+                          onChange={(e) => setNewClient({
+                            ...newClient,
+                            visit_date: e.target.value,
+                            status: 'Upcoming Visit'
+                          })}
+                        />
+                      </div>
+                      <div className="form-field">
+                        <label style={{ fontSize: '11px', fontWeight: '600', color: '#166534' }}>Visit Time</label>
+                        <input
+                          type="time"
+                          value={newClient.visit_time}
+                          onChange={(e) => setNewClient({ ...newClient, visit_time: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="time-presets-row">
+                      <span className="time-preset-label">Quick Times:</span>
+                      {['10:30', '11:30', '14:00', '16:00', '17:30'].map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          className={`time-preset-btn ${newClient.visit_time === t ? 'active' : ''}`}
+                          onClick={() => setNewClient({ ...newClient, visit_time: t })}
+                        >
+                          {t === '10:30' ? '10:30 AM' : t === '11:30' ? '11:30 AM' : t === '14:00' ? '02:00 PM' : t === '16:00' ? '04:00 PM' : '05:30 PM'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {newClient.visit_date && (
+                      <div className={`visit-scheduled-live-hint ${newClient.visit_date === tomorrowStr ? 'tomorrow' : ''}`}>
+                        {newClient.visit_date === tomorrowStr ? (
+                          <span>
+                            📢 <strong>Tomorrow Radar Alert:</strong> This client will automatically appear on <strong>Tomorrow's Upcoming Visits</strong> radar with complete dossier and alert Admin in real time!
+                          </span>
+                        ) : newClient.visit_date === todayStr ? (
+                          <span>
+                            🟢 <strong>Today's Live Radar:</strong> This visit will immediately appear under <strong>Today's Scheduled Visits</strong> with 1-click completion.
+                          </span>
+                        ) : (
+                          <span>
+                            🗓️ <strong>Scheduled Visit:</strong> Appointment recorded for <strong>{newClient.visit_date}</strong> {newClient.visit_time ? `at ${newClient.visit_time}` : ''}.
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="form-field">
+                      <label style={{ fontSize: '11px', fontWeight: '600', color: '#166534' }}>Visit Notes / Remarks</label>
+                      <input
+                        value={newClient.visit_notes}
+                        onChange={(e) => setNewClient({ ...newClient, visit_notes: e.target.value })}
+                        placeholder="e.g. Interested in 3 BHK Sample Flat tour"
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Fixed Footer with Actions */}
@@ -2238,6 +2285,236 @@ function Clients() {
         </div>
       )}
     </Shell>
+  );
+}
+
+function ClientVisitJourneyChart({
+  client,
+  visits = [],
+  onBack,
+  isAdmin = false,
+  onUpdateStatus,
+  embedded = false
+}) {
+  const STAGES = [
+    { key: 'Upcoming', title: 'Upcoming' },
+    { key: 'Visited', title: 'Visited' },
+    { key: 'FollowUp', title: 'FollowUp' },
+    { key: 'Revisited', title: 'Revisited' },
+    { key: 'Booked', title: 'Booked' },
+    { key: 'Closed', title: 'Closed' }
+  ];
+
+  const getStageIndex = (st) => {
+    if (!st) return 0;
+    const clean = String(st).toLowerCase().replace(/[\s-_]/g, '');
+    if (clean === 'upcoming' || clean === 'scheduled' || clean === 'upcomingvisit') return 0;
+    if (clean === 'visited' || clean === 'completed') return 1;
+    if (clean === 'followup') return 2;
+    if (clean === 'revisited') return 3;
+    if (clean === 'booked') return 4;
+    if (clean === 'closed') return 5;
+    return 0;
+  };
+
+  let currentStageIndex = 0;
+  if (visits && visits.length > 0) {
+    visits.forEach((v) => {
+      const idx = getStageIndex(v.status);
+      if (idx > currentStageIndex) currentStageIndex = idx;
+    });
+  } else if (client?.status) {
+    currentStageIndex = getStageIndex(client.status);
+  }
+
+  const currentStageObj = STAGES[currentStageIndex];
+
+  return (
+    <div className="simple-journey-card">
+      {/* Header Bar */}
+      <div className="simple-journey-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          {onBack && (
+            <button
+              type="button"
+              className="simple-journey-back-btn"
+              onClick={onBack}
+              title="Return to site visit records list"
+            >
+              <ArrowLeft size={15} /> <span>All Visits</span>
+            </button>
+          )}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', color: '#112d27', fontWeight: '700' }}>
+                {client?.name || 'Client Visit Details'}
+              </h3>
+              <span className={`visit-status-pill status-${currentStageObj.key.toLowerCase()}`}>
+                ● {currentStageObj.title}
+              </span>
+            </div>
+            <div style={{ color: '#6b7c77', fontSize: '12px', marginTop: '3px' }}>
+              {client?.id ? `Client ID: #CL-${String(client.id).padStart(4, '0')} • ` : ''}
+              Unit: <b>{client?.unit_type || '2 BHK'}</b>
+              {client?.budget ? ` • Budget: ${client.budget}` : ''}
+              {client?.phone ? ` • Mobile: ${client.phone}` : ''}
+            </div>
+          </div>
+        </div>
+
+        <div className="simple-journey-badge-wrap">
+          <span className="simple-journey-step-count">
+            Stage <b>{currentStageIndex + 1}</b> of <b>{STAGES.length}</b>
+          </span>
+        </div>
+      </div>
+
+      {/* Simple 6-Stage Pipeline Tracker */}
+      <div className="simple-stepper-container">
+        <div className="simple-stepper-grid">
+          {STAGES.map((st, idx) => {
+            const isDone = idx < currentStageIndex;
+            const isCurrent = idx === currentStageIndex;
+
+            let stepClass = 'step-pending';
+            if (isDone) stepClass = 'step-completed';
+            if (isCurrent) stepClass = 'step-active';
+
+            return (
+              <div
+                key={st.key}
+                className={`simple-step-item ${stepClass}`}
+                onClick={() => {
+                  if (isAdmin && visits.length > 0 && onUpdateStatus) {
+                    onUpdateStatus(visits[0].id, st.key);
+                  }
+                }}
+                style={{ cursor: isAdmin && visits.length > 0 ? 'pointer' : 'default' }}
+                title={isAdmin ? `Click to set client stage to ${st.title}` : st.title}
+              >
+                <div className="simple-step-num">
+                  {isDone ? <Check size={14} strokeWidth={3} /> : idx + 1}
+                </div>
+                <div className="simple-step-text">
+                  <span className="simple-step-name">{st.title}</span>
+                  {isCurrent && <span className="simple-step-curr-tag">Active</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Admin Quick Action Controls or CP Read-Only Notice */}
+      <div className="simple-journey-action-card">
+        {isAdmin ? (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+              <span style={{ fontSize: '12px', fontWeight: '700', color: '#163a33' }}>
+                ⚡ Admin: Click to Advance Stage:
+              </span>
+              <small style={{ color: '#6b7c77', fontSize: '11px' }}>
+                Updates client visit status in MySQL
+              </small>
+            </div>
+            <div className="simple-stage-btn-row">
+              {STAGES.map((st) => (
+                <button
+                  key={st.key}
+                  type="button"
+                  className={`btn-stage-quick ${currentStageObj.key === st.key ? 'active' : ''}`}
+                  onClick={() => {
+                    if (visits.length > 0 && onUpdateStatus) {
+                      onUpdateStatus(visits[0].id, st.key);
+                    }
+                  }}
+                  disabled={visits.length === 0}
+                  title={`Set status to ${st.title}`}
+                >
+                  {st.title}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="cp-readonly-banner">
+            <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#075c4d' }}>
+              👁️ Channel Partner Status:
+            </span>
+            <span style={{ fontSize: '12.5px', color: '#4b5563', marginLeft: '6px' }}>
+              Current stage is <b>{currentStageObj.title}</b> (Stage {currentStageIndex + 1} of 6). Status is managed by Admin.
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Individual Site Visits History Timeline for this Client */}
+      {!embedded && (
+        <div className="journey-visits-history">
+          <h4 style={{ margin: '0 0 12px', fontSize: '14px', color: '#163a33', fontWeight: '700' }}>
+            Site Visit Activity for {client?.name} ({visits.length})
+          </h4>
+
+          {visits.length === 0 ? (
+            <div className="empty-msg" style={{ padding: '16px', textAlign: 'center' }}>
+              No visit appointments recorded yet for this client.
+            </div>
+          ) : (
+            <div className="timeline">
+              {visits.map((v) => {
+                const dayClass = getVisitDayClassification(v.visit_date);
+                const dateDisplay = dayClass.formattedDate || new Date(v.visit_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+                return (
+                  <div className="visit" key={v.id}>
+                    <span className="dot" />
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                        <small style={{ fontWeight: '600', color: '#163a33' }}>
+                          📅 {dateDisplay}
+                          {v.visit_time ? ` • ⏰ ${v.visit_time}` : ''}
+                        </small>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <small style={{ fontSize: '10px', color: '#6b7c77', fontWeight: '600' }}>STATUS:</small>
+                          {isAdmin ? (
+                            <select
+                              className="status-dropdown"
+                              value={v.status || 'Upcoming'}
+                              onChange={(e) => onUpdateStatus && onUpdateStatus(v.id, e.target.value)}
+                              title="Update visit status in MySQL"
+                            >
+                              {STAGES.map((s) => (
+                                <option key={s.key} value={s.key}>{s.key}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
+                              {v.status || 'Upcoming'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ marginTop: '6px', fontSize: '13px', color: '#374151' }}>
+                        <b>Remarks:</b> {v.notes || 'No remarks provided.'}
+                      </div>
+
+                      {(v.partner_name || v.partner_firm_name) && (
+                        <div style={{ marginTop: '6px' }}>
+                          <small style={{ color: '#075c4d', fontWeight: '600' }}>
+                            👤 Registered CP: {v.partner_name}{v.partner_firm_name ? ` (${v.partner_firm_name})` : ''}
+                          </small>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -2258,7 +2535,7 @@ function Details() {
     visit_date: '',
     visit_time: '11:00 AM',
     notes: '',
-    status: 'scheduled'
+    status: 'Upcoming'
   });
 
   // Reply Modal for complaints inside details
@@ -2284,7 +2561,7 @@ function Details() {
       visit_date: todayStr,
       visit_time: '11:00 AM',
       notes: `Site tour of ${client?.unit_type || '2 BHK'} show flat and amenities inspection`,
-      status: 'scheduled'
+      status: 'Upcoming'
     });
     setShowScheduleVisitModal(true);
   };
@@ -2302,7 +2579,7 @@ function Details() {
         visit_date: newVisitData.visit_date,
         visit_time: newVisitData.visit_time || '11:00 AM',
         notes: newVisitData.notes || '',
-        status: newVisitData.status || 'scheduled'
+        status: newVisitData.status || 'Upcoming'
       });
       setShowScheduleVisitModal(false);
       setToast('Visit successfully scheduled & saved to MySQL!');
@@ -2314,6 +2591,18 @@ function Details() {
       alert(err.message || 'Failed to schedule visit');
     } finally {
       setScheduleSubmitting(false);
+    }
+  };
+
+  const handleVisitStatusChange = async (visitId, newStatus) => {
+    try {
+      await api.updateVisit(visitId, { status: newStatus });
+      setToast(`Visit status updated to "${newStatus}" in MySQL!`);
+      setTimeout(() => setToast(''), 4000);
+      loadClient();
+      window.dispatchEvent(new CustomEvent('portal-refresh'));
+    } catch (err) {
+      alert(err.message || 'Failed to update visit status');
     }
   };
 
@@ -2403,9 +2692,11 @@ function Details() {
           <small>Client Master Record #{client.id}</small>
           <h2>{client.name}</h2>
         </div>
-        <button type="button" className="btn-sm" onClick={() => setShowEditModal(true)}>
-          <Edit size={14} /> Edit Client
-        </button>
+        {isAdmin && (
+          <button type="button" className="btn-sm" onClick={() => setShowEditModal(true)}>
+            <Edit size={14} /> Edit Client
+          </button>
+        )}
       </div>
 
       <div className="client-detail-hero-figma">
@@ -2433,23 +2724,21 @@ function Details() {
             <span className="view-details-hint">View Details →</span>
           </button>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
-          <small style={{ fontSize: '11px', color: '#6b7280', fontWeight: '600' }}>Status in MySQL:</small>
-          <select
-            className="status-dropdown"
-            style={{ width: 'auto', padding: '4px 10px', fontSize: '12px' }}
-            value={client.status || 'Pending'}
-            onChange={(e) => handleStatusChange(e.target.value)}
-            title="Change client status in MySQL"
-          >
-            <option value="Pending">Pending</option>
-            <option value="Visited">Visited</option>
-            <option value="Negotiation">Negotiation</option>
-            <option value="Booked">Booked</option>
-            <option value="Closed">Closed</option>
-            <option value="Lost">Lost</option>
-          </select>
-        </div>
+        {isAdmin && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
+            <small style={{ fontSize: '11px', color: '#6b7280', fontWeight: '600' }}>Status in MySQL:</small>
+            <select
+              className="status-dropdown"
+              style={{ width: 'auto', padding: '4px 10px', fontSize: '12px' }}
+              value={client.status || 'Upcoming Visit'}
+              onChange={(e) => handleStatusChange(e.target.value)}
+              title="Change client status in MySQL"
+            >
+              <option value="Upcoming Visit">Upcoming Visit</option>
+              <option value="Closed">Closed</option>
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="subtabs">
@@ -2475,10 +2764,9 @@ function Details() {
             ['Phone Number', client.phone || 'Not provided'],
             ['Email Address', client.email || 'Not provided'],
             ['Project Interest', 'Park Solitaire — Premium Residences'],
-            ['Unit Type Requirement', client.unit_type || '2 BHK / 3 BHK'],
+            ['Unit Type Requirement', client.unit_type || '1 BHK / 2 BHK / 3 BHK'],
             ['Budget Range', client.budget || '₹ 50L - 70L'],
-            ['Lead Source', client.source || 'Referral'],
-            ['Status', client.status || 'Pending'],
+            ['Status', client.status || 'Upcoming Visit'],
             ['Client Address', client.address || 'Not specified'],
             ['Registered By Partner', client.partner_name ? `${client.partner_name}${client.partner_firm_name ? ` (${client.partner_firm_name})` : ''}` : 'Direct / Admin'],
             ['Partner Phone', [client.partner_phone, client.partner_phone2].filter(Boolean).join(' / ') || 'N/A'],
@@ -2497,29 +2785,43 @@ function Details() {
         <div className="subtab-content">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
             <div>
-              <h4 style={{ margin: 0, fontSize: '15px', color: '#163a33' }}>Site Visits History ({client.visits?.length || 0})</h4>
-              <small style={{ color: '#6b7c77' }}>Scheduled tours and client walk-ins</small>
+              <h4 style={{ margin: 0, fontSize: '15px', color: '#163a33' }}>Site Visits History &amp; Milestone Journey ({client.visits?.length || 0})</h4>
+              <small style={{ color: '#6b7c77' }}>Customer property visit pipeline &amp; inspection history</small>
             </div>
-            <button
-              type="button"
-              className="btn-sm btn-primary"
-              onClick={handleOpenScheduleVisit}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '6px 14px', fontSize: '12.5px' }}
-            >
-              <Plus size={14} /> + Schedule Visit
-            </button>
-          </div>
-          {(!client.visits || client.visits.length === 0) ? (
-            <div className="empty-msg" style={{ textAlign: 'center', padding: '24px 16px' }}>
-              <div style={{ marginBottom: '8px' }}>No site visits recorded for this client yet.</div>
+            {isAdmin && (
               <button
                 type="button"
                 className="btn-sm btn-primary"
                 onClick={handleOpenScheduleVisit}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', margin: '0 auto' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '6px 14px', fontSize: '12.5px' }}
               >
-                <Plus size={14} /> Schedule First Visit
+                <Plus size={14} /> + Schedule Visit
               </button>
+            )}
+          </div>
+
+          {/* Visual Visit Journey Flowchart */}
+          <ClientVisitJourneyChart
+            client={client}
+            visits={client.visits || []}
+            isAdmin={isAdmin}
+            onUpdateStatus={handleVisitStatusChange}
+            embedded={true}
+          />
+
+          {(!client.visits || client.visits.length === 0) ? (
+            <div className="empty-msg" style={{ textAlign: 'center', padding: '24px 16px' }}>
+              <div style={{ marginBottom: '8px' }}>No site visits recorded for this client yet.</div>
+              {isAdmin && (
+                <button
+                  type="button"
+                  className="btn-sm btn-primary"
+                  onClick={handleOpenScheduleVisit}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', margin: '0 auto' }}
+                >
+                  <Plus size={14} /> Schedule First Visit
+                </button>
+              )}
             </div>
           ) : (
             <div className="timeline">
@@ -2527,14 +2829,32 @@ function Details() {
                 <div className="visit" key={v.id}>
                   <span className="dot" />
                   <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <small>{new Date(v.visit_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}{v.visit_time ? ` • ⏰ ${v.visit_time}` : ''}</small>
-                      <span className={`status-pill-figma ${(v.status || 'scheduled').toLowerCase()}`}>
-                        {v.status ? v.status.charAt(0).toUpperCase() + v.status.slice(1) : 'Scheduled'}
-                      </span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                      <small style={{ fontWeight: '600', color: '#163a33' }}>
+                        📅 {new Date(v.visit_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}{v.visit_time ? ` • ⏰ ${v.visit_time}` : ''}
+                      </small>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <small style={{ fontSize: '10px', color: '#6b7c77', fontWeight: '600' }}>STATUS:</small>
+                        {isAdmin ? (
+                          <select
+                            className="status-dropdown"
+                            value={v.status || 'Upcoming'}
+                            onChange={(e) => handleVisitStatusChange(v.id, e.target.value)}
+                            title="Update visit status in MySQL"
+                          >
+                            {['Upcoming', 'Visited', 'FollowUp', 'Revisited', 'Booked', 'Closed'].map((s) => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
+                            {v.status || 'Upcoming'}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <b>Site Visit — {v.status || 'Scheduled'}</b>
-                    <p>{v.notes || 'No remarks provided.'}</p>
+                    <b style={{ fontSize: '14px', marginTop: '4px', display: 'inline-block' }}>Site Visit — {v.status || 'Upcoming'}</b>
+                    <p style={{ marginTop: '4px' }}>{v.notes || 'No remarks provided.'}</p>
                   </div>
                 </div>
               ))}
@@ -2615,15 +2935,17 @@ function Details() {
         </div>
       )}
 
-      {/* Bottom Action Buttons (Figma Screen 7) */}
-      <div className="details-bottom-bar-figma">
-        <button type="button" className="btn-outline-figma" onClick={() => setShowEditModal(true)}>
-          Edit Lead
-        </button>
-        <button type="button" className="btn-primary-figma" onClick={handleOpenScheduleVisit}>
-          + Schedule Visit
-        </button>
-      </div>
+      {/* Bottom Action Buttons (Admin Only) */}
+      {isAdmin && (
+        <div className="details-bottom-bar-figma">
+          <button type="button" className="btn-outline-figma" onClick={() => setShowEditModal(true)}>
+            Edit Client
+          </button>
+          <button type="button" className="btn-primary-figma" onClick={handleOpenScheduleVisit}>
+            + Schedule Visit
+          </button>
+        </div>
+      )}
 
       {/* Edit Client Modal */}
       {showEditModal && (
@@ -2667,10 +2989,14 @@ function Details() {
 
                   <div className="form-field">
                     <label>Unit Type Requirement</label>
-                    <input
-                      value={editData.unit_type || ''}
+                    <select
+                      value={editData.unit_type || '1 BHK'}
                       onChange={(e) => setEditData({ ...editData, unit_type: e.target.value })}
-                    />
+                    >
+                      <option value="1 BHK">1 BHK</option>
+                      <option value="2 BHK">2 BHK</option>
+                      <option value="3 BHK">3 BHK</option>
+                    </select>
                   </div>
 
                   <div className="form-field">
@@ -2684,25 +3010,12 @@ function Details() {
                   <div className="form-field">
                     <label>Pipeline Status</label>
                     <select
-                      value={editData.status || 'Pending'}
+                      value={editData.status || 'Upcoming Visit'}
                       onChange={(e) => setEditData({ ...editData, status: e.target.value })}
                     >
-                      <option value="Pending">Pending</option>
-                      <option value="Site Visit Planned">Site Visit Planned</option>
-                      <option value="Visited">Visited</option>
-                      <option value="Negotiation">Negotiation</option>
-                      <option value="Booked">Booked</option>
+                      <option value="Upcoming Visit">Upcoming Visit</option>
                       <option value="Closed">Closed</option>
-                      <option value="Lost">Lost</option>
                     </select>
-                  </div>
-
-                  <div className="form-field">
-                    <label>Lead Source</label>
-                    <input
-                      value={editData.source || ''}
-                      onChange={(e) => setEditData({ ...editData, source: e.target.value })}
-                    />
                   </div>
 
                   <div className="form-field full-col">
@@ -2774,7 +3087,7 @@ function Details() {
       )}
 
       {/* Schedule Client Visit Modal */}
-      {showScheduleVisitModal && (
+      {isAdmin && showScheduleVisitModal && (
         <div className="modal-overlay" onClick={() => setShowScheduleVisitModal(false)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
@@ -2841,9 +3154,12 @@ function Details() {
                     value={newVisitData.status}
                     onChange={(e) => setNewVisitData({ ...newVisitData, status: e.target.value })}
                   >
-                    <option value="scheduled">Scheduled</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
+                    <option value="Upcoming">Upcoming</option>
+                    <option value="Visited">Visited</option>
+                    <option value="FollowUp">FollowUp</option>
+                    <option value="Revisited">Revisited</option>
+                    <option value="Booked">Booked</option>
+                    <option value="Closed">Closed</option>
                   </select>
                 </div>
 
@@ -2876,17 +3192,26 @@ function Details() {
 
 function Visits() {
   const { openUserDetails } = useUserModal();
+  const userStr = localStorage.getItem('user');
+  let user = { role: 'admin' };
+  try { if (userStr) user = JSON.parse(userStr); } catch {}
+  const isAdmin = user.role === 'admin';
+  const prefix = isAdmin ? '/admin' : '/partner';
+
+  const [selectedClientId, setSelectedClientId] = useState(null);
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [clients, setClients] = useState([]);
   const [toast, setToast] = useState('');
-  const [newVisit, setNewVisit] = useState({ client_id: '', visit_date: '', visit_time: '11:00 AM', notes: '', status: 'scheduled' });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [newVisit, setNewVisit] = useState({ client_id: '', visit_date: '', visit_time: '11:00 AM', notes: '', status: 'Upcoming' });
 
   const now = new Date();
   const pad = (n) => String(n).padStart(2, '0');
   const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  const tomorrowObj = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const tomorrowObj = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
   const tomorrowStr = `${tomorrowObj.getFullYear()}-${pad(tomorrowObj.getMonth() + 1)}-${pad(tomorrowObj.getDate())}`;
 
   const openNewVisitModal = () => {
@@ -2895,7 +3220,7 @@ function Visits() {
       visit_date: prev.visit_date || todayStr,
       visit_time: prev.visit_time || '11:00 AM',
       notes: prev.notes || '',
-      status: prev.status || 'scheduled'
+      status: prev.status || 'Upcoming'
     }));
     setShowModal(true);
   };
@@ -2937,7 +3262,7 @@ function Visits() {
         visit_date: newVisit.visit_date,
         visit_time: newVisit.visit_time || '11:00 AM',
         notes: newVisit.notes || '',
-        status: newVisit.status || 'scheduled'
+        status: newVisit.status || 'Upcoming'
       });
       setShowModal(false);
       setToast('Visit scheduled & saved to MySQL!');
@@ -2955,10 +3280,20 @@ function Visits() {
       setToast(`Visit status updated to "${newStatus}" in MySQL!`);
       setTimeout(() => setToast(''), 4000);
       loadData(false);
+      window.dispatchEvent(new CustomEvent('portal-refresh'));
     } catch (err) {
       alert(err.message || 'Failed to update visit status');
     }
   };
+
+  const filteredVisits = visits.filter((v) => {
+    const qMatches = `${v.client_name || ''} ${v.partner_name || ''} ${v.partner_firm_name || ''} ${v.client_phone || ''} ${v.unit_type || ''} ${v.notes || ''}`
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+    if (!qMatches) return false;
+    if (statusFilter === 'All') return true;
+    return (v.status || 'Upcoming').toLowerCase() === statusFilter.toLowerCase();
+  });
 
   return (
     <Shell>
@@ -2971,76 +3306,215 @@ function Visits() {
 
       <div className="heading">
         <div>
-          <small>Client Activity & Follow-ups</small>
+          <small>{isAdmin ? 'Admin Master View' : 'Channel Partner Dashboard'}</small>
           <h2>Site Visit Records ({visits.length})</h2>
         </div>
-        <button type="button" className="icon" onClick={openNewVisitModal} title="Add Visit">
-          <Plus size={18} />
-        </button>
+        {isAdmin && (
+          <button type="button" className="icon" onClick={openNewVisitModal} title="Schedule Visit">
+            <Plus size={18} />
+          </button>
+        )}
       </div>
 
-      {loading ? (
-        <div className="empty-msg">Loading visits...</div>
-      ) : visits.length === 0 ? (
-        <div className="empty-msg">No visit updates recorded yet. Click + Add Update below.</div>
-      ) : (
-        <div className="timeline">
-          {visits.map((v) => (
-            <div className="visit" key={v.id}>
-              <span className="dot" />
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <small>
-                    {new Date(v.visit_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    {v.visit_time ? ` • ⏰ ${v.visit_time}` : ''}
-                  </small>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <small style={{ fontSize: '10px', color: '#6b7c77', fontWeight: '600' }}>STATUS:</small>
-                    <select
-                      className="status-dropdown"
-                      value={v.status || 'scheduled'}
-                      onChange={(e) => handleStatusChange(v.id, e.target.value)}
-                      title="Update visit status in MySQL"
-                    >
-                      <option value="scheduled">Scheduled</option>
-                      <option value="completed">Completed</option>
-                      <option value="cancelled">Cancelled</option>
-                    </select>
-                  </div>
-                </div>
-
-                <b style={{ fontSize: '15px', marginTop: '4px' }}>{v.client_name || 'Client Visit'}</b>
-                {v.partner_name && (
-                  <button
-                    type="button"
-                    className="badge badge-partner badge-clickable"
-                    style={{ margin: '4px 0', display: 'inline-flex' }}
-                    onClick={() => openUserDetails({
-                      id: v.partner_id,
-                      name: v.partner_name,
-                      firm_name: v.partner_firm_name,
-                      email: v.partner_email,
-                      phone: v.partner_phone,
-                      phone2: v.partner_phone2,
-                      role: 'partner'
-                    })}
-                    title="Click to view Channel Partner details (Mail, Mobile, Firm)"
-                  >
-                    👤 Partner: {v.partner_name}
-                  </button>
-                )}
-                <p>{v.notes || 'No remarks provided.'}</p>
-              </div>
-            </div>
+      {/* Quick Jump / Selector for Client Visit Journey Chart */}
+      <div className="visit-client-chart-selector-bar">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <BarChart2 size={18} style={{ color: '#075c4d' }} />
+          <span style={{ fontSize: '13px', fontWeight: '700', color: '#163a33' }}>
+            Client Visit Chart:
+          </span>
+        </div>
+        <select
+          value={selectedClientId ? String(selectedClientId) : ''}
+          onChange={(e) => setSelectedClientId(e.target.value ? Number(e.target.value) : null)}
+          className="client-chart-select"
+        >
+          <option value="">-- All Clients (Site Visits Timeline List) --</option>
+          {clients.map((c) => (
+            <option key={c.id} value={String(c.id)}>
+              {c.name} ({c.unit_type || '2 BHK'} • {c.phone || 'No phone'})
+            </option>
           ))}
+        </select>
+        {selectedClientId && (
+          <button
+            type="button"
+            className="btn-clear-chart-view"
+            onClick={() => setSelectedClientId(null)}
+          >
+            ✕ Back to All Visits
+          </button>
+        )}
+      </div>
+
+      {/* If a client is selected, render the ClientVisitJourneyChart */}
+      {selectedClientId ? (
+        <ClientVisitJourneyChart
+          client={
+            clients.find((c) => Number(c.id) === Number(selectedClientId)) || {
+              id: selectedClientId,
+              name: visits.find((v) => Number(v.client_id) === Number(selectedClientId))?.client_name || `Client #${selectedClientId}`,
+              phone: visits.find((v) => Number(v.client_id) === Number(selectedClientId))?.client_phone,
+              unit_type: visits.find((v) => Number(v.client_id) === Number(selectedClientId))?.unit_type || visits.find((v) => Number(v.client_id) === Number(selectedClientId))?.client_unit_type,
+              budget: visits.find((v) => Number(v.client_id) === Number(selectedClientId))?.budget || visits.find((v) => Number(v.client_id) === Number(selectedClientId))?.client_budget
+            }
+          }
+          visits={visits.filter((v) => Number(v.client_id) === Number(selectedClientId))}
+          onBack={() => setSelectedClientId(null)}
+          isAdmin={isAdmin}
+          onUpdateStatus={handleStatusChange}
+        />
+      ) : (
+        <>
+          <div className="search">
+            <Search size={16} />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={isAdmin ? "Search by client name, partner, mobile, or unit..." : "Search your site visits..."}
+            />
+          </div>
+
+          <div className="filter-pills-row">
+            {['All', 'Upcoming', 'Visited', 'FollowUp', 'Revisited', 'Booked', 'Closed'].map((st) => (
+              <button
+                key={st}
+                type="button"
+                className={`filter-pill-btn ${statusFilter === st ? 'active' : ''}`}
+                onClick={() => setStatusFilter(st)}
+              >
+                {st}
+              </button>
+            ))}
+          </div>
+
+          {loading ? (
+            <div className="empty-msg">Loading visits...</div>
+          ) : filteredVisits.length === 0 ? (
+            <div className="empty-msg">
+              {searchQuery || statusFilter !== 'All'
+                ? 'No visit updates match your filter.'
+                : 'No visit updates recorded yet.'}
+            </div>
+          ) : (
+        <div className="timeline">
+          {filteredVisits.map((v) => {
+            const dayClass = getVisitDayClassification(v.visit_date);
+            const dateDisplay = dayClass.formattedDate || new Date(v.visit_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+            return (
+              <div className="visit" key={v.id}>
+                <span className="dot" />
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <small style={{ fontWeight: '600', color: '#163a33' }}>
+                      📅 {dateDisplay}
+                      {v.visit_time ? ` • ⏰ ${v.visit_time}` : ''}
+                    </small>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <small style={{ fontSize: '10px', color: '#6b7c77', fontWeight: '600' }}>STATUS:</small>
+                      {isAdmin ? (
+                        <select
+                          className="status-dropdown"
+                          value={v.status || 'Upcoming'}
+                          onChange={(e) => handleStatusChange(v.id, e.target.value)}
+                          title="Update visit status in MySQL"
+                        >
+                          {['Upcoming', 'Visited', 'FollowUp', 'Revisited', 'Booked', 'Closed'].map((s) => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
+                          {v.status || 'Upcoming'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    {v.client_id ? (
+                      <Link
+                        to={`${prefix}/clients/${v.client_id}`}
+                        style={{ fontSize: '16px', fontWeight: '700', color: '#075c4d', textDecoration: 'underline' }}
+                        title="View Client Dossier Profile"
+                      >
+                        {v.client_name || `Client #${v.client_id}`}
+                      </Link>
+                    ) : (
+                      <b style={{ fontSize: '16px' }}>{v.client_name || 'Client Visit'}</b>
+                    )}
+
+                    {(v.unit_type || v.client_unit_type) && (
+                      <span className="visit-spec-pill unit-pill" style={{ fontSize: '11px', padding: '2px 8px' }}>
+                        {v.unit_type || v.client_unit_type}
+                      </span>
+                    )}
+
+                    {(v.budget || v.client_budget) && (
+                      <span className="visit-spec-pill budget-pill" style={{ fontSize: '11px', padding: '2px 8px' }}>
+                        {v.budget || v.client_budget}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Channel Partner info badge */}
+                  {(v.partner_name || v.partner_firm_name) && (
+                    <div style={{ margin: '6px 0' }}>
+                      <button
+                        type="button"
+                        className="badge badge-partner badge-clickable"
+                        style={{ display: 'inline-flex', padding: '4px 10px', fontSize: '11.5px' }}
+                        onClick={() => openUserDetails({
+                          id: v.partner_id,
+                          name: v.partner_name,
+                          firm_name: v.partner_firm_name,
+                          email: v.partner_email,
+                          phone: v.partner_phone,
+                          phone2: v.partner_phone2,
+                          role: 'partner'
+                        })}
+                        title="Click to view Channel Partner details (Mail, Mobile, Firm)"
+                      >
+                        👤 CP: {v.partner_name}{v.partner_firm_name ? ` (${v.partner_firm_name})` : ''}
+                      </button>
+                    </div>
+                  )}
+
+                  <p style={{ margin: '6px 0 0 0', color: '#4b5563', fontSize: '13px' }}>
+                    {v.notes || 'No remarks provided.'}
+                  </p>
+
+                  {/* View Client Visit Journey Flowchart Button */}
+                  {v.client_id && (
+                    <div style={{ marginTop: '10px' }}>
+                      <button
+                        type="button"
+                        className="btn-view-client-chart"
+                        onClick={() => setSelectedClientId(Number(v.client_id))}
+                        title="View visual site visit journey flowchart for this client"
+                      >
+                        <BarChart2 size={13} />
+                        <span>📊 View Visit Journey Chart</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
+      </>
+      )}
 
-      <button type="button" className="primary" style={{ marginTop: '14px' }} onClick={openNewVisitModal}>
-        + Schedule Visit Update
-      </button>
+      {isAdmin && !selectedClientId && (
+        <button type="button" className="primary" style={{ marginTop: '14px' }} onClick={openNewVisitModal}>
+          + Schedule Visit Update
+        </button>
+      )}
 
-      {showModal && (
+      {isAdmin && showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
@@ -3129,9 +3603,12 @@ function Visits() {
                     value={newVisit.status}
                     onChange={(e) => setNewVisit({ ...newVisit, status: e.target.value })}
                   >
-                    <option value="scheduled">Scheduled</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
+                    <option value="Upcoming">Upcoming</option>
+                    <option value="Visited">Visited</option>
+                    <option value="FollowUp">FollowUp</option>
+                    <option value="Revisited">Revisited</option>
+                    <option value="Booked">Booked</option>
+                    <option value="Closed">Closed</option>
                   </select>
                 </div>
 
@@ -3419,20 +3896,22 @@ function Complaints() {
                   {c.admin_reply ? 'Update Reply / Status' : 'Reply & Update Status'}
                 </button>
 
-                <div className="complaint-status-box">
-                  <small style={{ fontSize: '11px', color: '#6b7c77', fontWeight: '600' }}>Change Status:</small>
-                  <select
-                    className="status-dropdown"
-                    value={c.status || 'open'}
-                    onChange={(e) => handleQuickStatus(c.id, e.target.value)}
-                    title="Change ticket status in MySQL"
-                  >
-                    <option value="open">Open</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="resolved">Resolved</option>
-                    <option value="closed">Closed</option>
-                  </select>
-                </div>
+                {isAdmin && (
+                  <div className="complaint-status-box">
+                    <small style={{ fontSize: '11px', color: '#6b7c77', fontWeight: '600' }}>Change Status:</small>
+                    <select
+                      className="status-dropdown"
+                      value={c.status || 'open'}
+                      onChange={(e) => handleQuickStatus(c.id, e.target.value)}
+                      title="Change ticket status in MySQL"
+                    >
+                      <option value="open">Open</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="resolved">Resolved</option>
+                      <option value="closed">Closed</option>
+                    </select>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -3600,11 +4079,28 @@ function Complaints() {
 
 function Payments() {
   const { openUserDetails } = useUserModal();
+  const userStr = localStorage.getItem('user');
+  let currentUser = { role: 'partner', id: 2, name: 'Channel Partner', firm_name: '' };
+  try { if (userStr) currentUser = JSON.parse(userStr); } catch {}
+  const isAdmin = currentUser.role === 'admin';
+
   const [payments, setPayments] = useState([]);
+  const [bills, setBills] = useState([]);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('bills'); // 'bills' or 'payments'
+  const [filter, setFilter] = useState('all');
   const [toast, setToast] = useState('');
+
+  // Modals state
+  const [showRaiseBillModal, setShowRaiseBillModal] = useState(false);
+  const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
+  const [showPayoutModal, setShowPayoutModal] = useState(false);
+  const [selectedBillForPayment, setSelectedBillForPayment] = useState(null);
+  const [payoutDate, setPayoutDate] = useState('');
+  const [payoutRef, setPayoutRef] = useState('');
+
+  // New Client Payment form state (Admin only)
   const [newPayment, setNewPayment] = useState({
     client_id: '',
     amount: '',
@@ -3612,14 +4108,41 @@ function Payments() {
     status: 'pending'
   });
 
+  // Raise a Bill form state (Channel Partner)
+  const initialBillForm = {
+    client_id: '',
+    client_name: '',
+    purchase_details: '',
+    agreement_value: '',
+    brokerage_percent: '2.0',
+    account_details: 'HDFC Bank - Current Account',
+    account_holder_name: currentUser.firm_name || currentUser.name || '',
+    account_no: '',
+    ifsc_code: '',
+    branch: ''
+  };
+  const [billForm, setBillForm] = useState(initialBillForm);
+
   const loadData = (showSpinner = true) => {
     if (showSpinner) setLoading(true);
-    Promise.all([api.getPayments(), api.getClients()])
-      .then(([p, c]) => {
+    Promise.all([
+      api.getPayments().catch(() => []),
+      api.getBills().catch(() => []),
+      api.getClients().catch(() => [])
+    ])
+      .then(([p, b, c]) => {
         setPayments(Array.isArray(p) ? p : []);
-        setClients(Array.isArray(c) ? c : []);
-        if (Array.isArray(c) && c.length > 0) {
-          setNewPayment((prev) => ({ ...prev, client_id: prev.client_id || c[0].id }));
+        setBills(Array.isArray(b) ? b : []);
+        const clientList = Array.isArray(c) ? c : [];
+        setClients(clientList);
+
+        if (clientList.length > 0) {
+          setNewPayment((prev) => ({ ...prev, client_id: prev.client_id || clientList[0].id }));
+          setBillForm((prev) => ({
+            ...prev,
+            client_id: prev.client_id || clientList[0].id,
+            client_name: prev.client_name || clientList[0].name
+          }));
         }
       })
       .catch(() => {})
@@ -3633,36 +4156,126 @@ function Payments() {
     return () => window.removeEventListener('portal-refresh', handleRefresh);
   }, []);
 
-  const handleCreate = async (e) => {
+  // Live calculations for Raise a Bill
+  const agreementNum = parseFloat(billForm.agreement_value) || 0;
+  const brokerageNum = parseFloat(billForm.brokerage_percent) || 0;
+  const totalBillCalculated = (agreementNum * brokerageNum) / 100;
+
+  // Strict 10 or 12 digit Account Number validation
+  const cleanAcct = String(billForm.account_no || '').trim();
+  const isDigitsOnly = /^\d+$/.test(cleanAcct);
+  const isExactLength = cleanAcct.length === 10 || cleanAcct.length === 12;
+  const isAcctValid = isDigitsOnly && isExactLength;
+
+  const handleClientSelect = (clientId) => {
+    const found = clients.find((c) => String(c.id) === String(clientId));
+    if (found) {
+      setBillForm((prev) => ({
+        ...prev,
+        client_id: found.id,
+        client_name: found.name,
+        purchase_details: prev.purchase_details || (found.unit_type ? `${found.unit_type} Unit - Park Solitaire` : '')
+      }));
+    }
+  };
+
+  // Submit Raise a Bill (Channel Partner)
+  const handleRaiseBillSubmit = async (e) => {
+    e.preventDefault();
+    if (!isAcctValid) {
+      alert('Account number must be strictly 10 or 12 digits only.');
+      return;
+    }
+    if (!billForm.client_name.trim()) {
+      alert('Please specify a client name.');
+      return;
+    }
+    if (agreementNum <= 0) {
+      alert('Please enter a valid agreement value.');
+      return;
+    }
+
+    try {
+      await api.createBill({
+        ...billForm,
+        agreement_value: agreementNum,
+        brokerage_percent: brokerageNum,
+        total_bill: totalBillCalculated
+      });
+      setShowRaiseBillModal(false);
+      setBillForm({
+        ...initialBillForm,
+        client_id: clients[0]?.id || '',
+        client_name: clients[0]?.name || ''
+      });
+      setToast('Brokerage Bill raised successfully! Sent to Admin for payment.');
+      setTimeout(() => setToast(''), 4500);
+      loadData();
+      window.dispatchEvent(new CustomEvent('portal-refresh'));
+    } catch (err) {
+      alert(err.message || 'Failed to raise bill');
+    }
+  };
+
+  // Admin Make Payment for a CP Bill
+  const handleAdminPayoutSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedBillForPayment) return;
+    try {
+      await api.payBill(selectedBillForPayment.id, {
+        paid_date: payoutDate || new Date().toISOString().slice(0, 10),
+        payment_reference: payoutRef || 'Online Bank Payout'
+      });
+      setShowPayoutModal(false);
+      setSelectedBillForPayment(null);
+      setToast(`Payment of ₹${Number(selectedBillForPayment.total_bill).toLocaleString('en-IN')} marked as Paid!`);
+      setTimeout(() => setToast(''), 4500);
+      loadData();
+      window.dispatchEvent(new CustomEvent('portal-refresh'));
+    } catch (err) {
+      alert(err.message || 'Failed to process payout');
+    }
+  };
+
+  // Admin Create Client Payment
+  const handleCreatePayment = async (e) => {
     e.preventDefault();
     if (!newPayment.client_id || !newPayment.amount) return;
     try {
       await api.createPayment(newPayment);
-      setShowModal(false);
+      setShowRecordPaymentModal(false);
       setNewPayment({ client_id: clients[0]?.id || '', amount: '', due_date: '', status: 'pending' });
       setToast('Payment record saved to MySQL!');
       setTimeout(() => setToast(''), 4000);
       loadData();
+      window.dispatchEvent(new CustomEvent('portal-refresh'));
     } catch (err) {
       alert(err.message || 'Failed to record payment');
     }
   };
 
-  const handleStatusChange = async (paymentId, newStatus) => {
+  // Admin Update Client Payment Status
+  const handlePaymentStatusChange = async (paymentId, newStatus) => {
     try {
       const paidDate = newStatus === 'paid' ? new Date().toISOString().slice(0, 10) : null;
       await api.updatePayment(paymentId, { status: newStatus, paid_date: paidDate });
       setToast(`Payment marked as "${newStatus}" in MySQL!`);
       setTimeout(() => setToast(''), 4000);
       loadData();
+      window.dispatchEvent(new CustomEvent('portal-refresh'));
     } catch (err) {
       alert(err.message || 'Failed to update payment status');
     }
   };
 
-  const [filter, setFilter] = useState('all');
+  // Filter bills
+  const filteredBills = bills.filter((b) => {
+    if (filter === 'all') return true;
+    return (b.status || '').toLowerCase() === filter.toLowerCase();
+  });
 
-  const filtered = payments.filter((p) => {
+  // Filter payments
+  const filteredPayments = payments.filter((p) => {
     if (filter === 'all') return true;
     return (p.status || '').toLowerCase() === filter.toLowerCase();
   });
@@ -3678,11 +4291,47 @@ function Payments() {
 
       <div className="heading">
         <div>
-          <small>Finance & Brokerage</small>
-          <h2>Payment Status ({payments.length})</h2>
+          <small>{isAdmin ? 'Finance & Brokerage Admin' : 'Brokerage Commission & Billing'}</small>
+          <h2>{isAdmin ? 'CP Bills & Payment Approvals' : 'My Brokerage Bills & Payments'}</h2>
         </div>
-        <button type="button" className="icon" onClick={() => setShowModal(true)} title="Record Payment">
-          <Plus size={18} />
+        {!isAdmin ? (
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => setShowRaiseBillModal(true)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', fontWeight: '600' }}
+            title="Raise a Bill for Brokerage Commission"
+          >
+            <Plus size={16} /> Raise a Bill
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="btn-sm"
+            onClick={() => setShowRecordPaymentModal(true)}
+            title="Record Client Payment"
+          >
+            <Plus size={16} /> Record Client Payment
+          </button>
+        )}
+      </div>
+
+      <div className="subtabs" style={{ marginBottom: '14px' }}>
+        <button
+          type="button"
+          className={activeTab === 'bills' ? 'on' : ''}
+          onClick={() => setActiveTab('bills')}
+        >
+          <Landmark size={15} style={{ marginRight: '6px', verticalAlign: '-2px' }} />
+          {isAdmin ? 'CP Brokerage Bills' : 'My Raised Bills'} ({bills.length})
+        </button>
+        <button
+          type="button"
+          className={activeTab === 'payments' ? 'on' : ''}
+          onClick={() => setActiveTab('payments')}
+        >
+          <CircleDollarSign size={15} style={{ marginRight: '6px', verticalAlign: '-2px' }} />
+          Client Payment Records ({payments.length})
         </button>
       </div>
 
@@ -3700,85 +4349,556 @@ function Payments() {
       </div>
 
       {loading ? (
-        <div className="empty-msg">Loading payments from MySQL...</div>
-      ) : filtered.length === 0 ? (
-        <div className="empty-msg">No payment records found matching this filter. Click + to record one.</div>
-      ) : (
-        <div className="list">
-          {filtered.map((p) => (
-            <div className="payment payment-row" key={p.id}>
-              <div className="payment-info">
-                <span className="person">
-                  {(p.client_name || 'P').charAt(0).toUpperCase()}
-                </span>
-                <div className="payment-details">
-                  <b>
-                    {p.client_name || 'Client'}
-                    {p.partner_name && (
-                      <button
-                        type="button"
-                        className="badge badge-partner badge-clickable"
-                        onClick={() => openUserDetails({
-                          id: p.partner_id,
-                          name: p.partner_name,
-                          firm_name: p.partner_firm_name,
-                          email: p.partner_email,
-                          phone: p.partner_phone,
-                          phone2: p.partner_phone2,
-                          role: 'partner'
-                        })}
-                        title="Click to view Channel Partner details (Mail, Mobile, Firm)"
-                      >
-                        👤 CP: {p.partner_name}
-                      </button>
+        <div className="empty-msg">Loading financial records from MySQL...</div>
+      ) : activeTab === 'bills' ? (
+        /* TAB 1: CP BROKERAGE BILLS */
+        filteredBills.length === 0 ? (
+          <div className="empty-msg">
+            No bills found matching this filter.
+            {!isAdmin && (
+              <div style={{ marginTop: '10px' }}>
+                <button
+                  type="button"
+                  className="btn-sm btn-primary"
+                  onClick={() => setShowRaiseBillModal(true)}
+                >
+                  <Plus size={14} /> Raise a Bill Now
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="list">
+            {filteredBills.map((b) => (
+              <div
+                key={b.id}
+                className="bill-card-figma"
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '12px',
+                  padding: '16px 18px',
+                  marginBottom: '12px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px', marginBottom: '10px' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <strong style={{ fontSize: '15px', color: '#163630' }}>
+                        Bill #{b.id} — {b.client_name}
+                      </strong>
+                      <span className={`status-pill-figma ${b.status === 'paid' ? 'paid' : 'pending'}`}>
+                        {b.status === 'paid' ? 'Paid' : 'Pending Payment'}
+                      </span>
+                    </div>
+                    <small style={{ color: '#6b7c77', fontSize: '12px', display: 'block', marginTop: '2px' }}>
+                      Raised on {new Date(b.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </small>
+                  </div>
+
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: '11px', color: '#6b7c77', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Brokerage Bill Amount
+                    </div>
+                    <strong style={{ fontSize: '18px', color: '#075c4d', fontWeight: '800' }}>
+                      ₹ {Number(b.total_bill).toLocaleString('en-IN')}
+                    </strong>
+                    <div style={{ fontSize: '11.5px', color: '#6b7c77' }}>
+                      {b.brokerage_percent}% of ₹{Number(b.agreement_value).toLocaleString('en-IN')}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Purchase & CP Info */}
+                <div style={{ background: '#f8fafc', padding: '10px 14px', borderRadius: '8px', fontSize: '12.5px', marginBottom: '10px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
+                  <div>
+                    <span style={{ color: '#64748b' }}>Purchase Details: </span>
+                    <strong style={{ color: '#1e293b' }}>{b.purchase_details || 'Unit Booking'}</strong>
+                  </div>
+                  {isAdmin && (
+                    <div>
+                      <span style={{ color: '#64748b' }}>Channel Partner: </span>
+                      <strong style={{ color: '#1e293b' }}>
+                        {b.partner_name}{b.partner_firm_name ? ` (${b.partner_firm_name})` : ''}
+                      </strong>
+                      {b.partner_phone && <span style={{ color: '#64748b' }}> • {b.partner_phone}</span>}
+                    </div>
+                  )}
+                </div>
+
+                {/* Bank Details Section */}
+                <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: '10px', marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <div style={{ fontSize: '12px', color: '#475569', display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Landmark size={13} style={{ color: '#075c4d' }} />
+                      <b>Bank:</b> {b.account_details || 'Bank Account'}
+                    </span>
+                    <span>
+                      <b>A/C Holder:</b> {b.account_holder_name || b.partner_name}
+                    </span>
+                    <span>
+                      <b>A/C No:</b> <code style={{ background: '#e2e8f0', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>{b.account_no}</code>
+                    </span>
+                    <span>
+                      <b>IFSC:</b> {b.ifsc_code}
+                    </span>
+                    {b.branch && (
+                      <span>
+                        <b>Branch:</b> {b.branch}
+                      </span>
                     )}
-                  </b>
-                  <small>
-                    {p.due_date && `Due: ${new Date(p.due_date).toLocaleDateString('en-GB')}`}
-                    {p.paid_date && `Paid: ${new Date(p.paid_date).toLocaleDateString('en-GB')}`}
-                    {!p.due_date && !p.paid_date && 'Transaction logged'}
+                  </div>
+
+                  {/* Actions */}
+                  <div>
+                    {b.status === 'pending' ? (
+                      isAdmin ? (
+                        <button
+                          type="button"
+                          className="btn-sm btn-primary"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '6px 14px', fontSize: '12.5px' }}
+                          onClick={() => {
+                            setSelectedBillForPayment(b);
+                            setPayoutDate(new Date().toISOString().slice(0, 10));
+                            setPayoutRef('');
+                            setShowPayoutModal(true);
+                          }}
+                        >
+                          <CreditCard size={14} /> Make Payment
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: '12px', color: '#d97706', fontWeight: '600' }}>
+                          ⏳ Awaiting Admin Approval & Payout
+                        </span>
+                      )
+                    ) : (
+                      <div style={{ textAlign: 'right', fontSize: '12px', color: '#15803d' }}>
+                        <b>✓ Paid on {new Date(b.paid_date || b.created_at).toLocaleDateString('en-GB')}</b>
+                        {b.payment_reference && (
+                          <span style={{ color: '#64748b', display: 'block', fontSize: '11px' }}>
+                            Ref: {b.payment_reference}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      ) : (
+        /* TAB 2: CLIENT PAYMENT RECORDS */
+        filteredPayments.length === 0 ? (
+          <div className="empty-msg">No client payment records found matching this filter.</div>
+        ) : (
+          <div className="list">
+            {filteredPayments.map((p) => (
+              <div className="payment payment-row" key={p.id}>
+                <div className="payment-info">
+                  <span className="person">
+                    {(p.client_name || 'P').charAt(0).toUpperCase()}
+                  </span>
+                  <div className="payment-details">
+                    <b>
+                      {p.client_name || 'Client'}
+                      {p.partner_name && (
+                        <button
+                          type="button"
+                          className="badge badge-partner badge-clickable"
+                          onClick={() => openUserDetails({
+                            id: p.partner_id,
+                            name: p.partner_name,
+                            firm_name: p.partner_firm_name,
+                            email: p.partner_email,
+                            phone: p.partner_phone,
+                            phone2: p.partner_phone2,
+                            role: 'partner'
+                          })}
+                          title="Click to view Channel Partner details (Mail, Mobile, Firm)"
+                        >
+                          👤 CP: {p.partner_name}
+                        </button>
+                      )}
+                    </b>
+                    <small>
+                      {p.due_date && `Due: ${new Date(p.due_date).toLocaleDateString('en-GB')}`}
+                      {p.paid_date && `Paid: ${new Date(p.paid_date).toLocaleDateString('en-GB')}`}
+                      {!p.due_date && !p.paid_date && 'Transaction logged'}
+                    </small>
+                  </div>
+                </div>
+
+                <div className="payment-actions" style={{ alignItems: 'flex-end' }}>
+                  <strong style={{ fontSize: '15px', color: '#111827' }}>
+                    ₹ {Number(p.amount).toLocaleString('en-IN')}
+                  </strong>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span className={`status-pill-figma ${(p.status || 'pending').toLowerCase()}`}>
+                      {p.status}
+                    </span>
+                    {/* ONLY Admin has authority to change payment status */}
+                    {isAdmin && (
+                      <select
+                        className="status-dropdown"
+                        style={{ width: 'auto', padding: '3px 8px', fontSize: '11.5px' }}
+                        value={p.status || 'pending'}
+                        onChange={(e) => handlePaymentStatusChange(p.id, e.target.value)}
+                        title="Update payment status in MySQL"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="paid">Mark Paid</option>
+                        <option value="overdue">Overdue</option>
+                      </select>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+
+      {/* Bottom Button for CP */}
+      {!isAdmin && (
+        <button
+          type="button"
+          className="primary"
+          style={{ marginTop: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+          onClick={() => setShowRaiseBillModal(true)}
+        >
+          <Plus size={16} /> Raise a Bill
+        </button>
+      )}
+
+      {/* MODAL 1: RAISE A BILL (Channel Partner Form) */}
+      {showRaiseBillModal && (
+        <div className="modal-overlay" onClick={() => setShowRaiseBillModal(false)}>
+          <div className="modal-box modal-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span className="person" style={{ width: '32px', height: '32px', fontSize: '13px', background: '#dcfce7', color: '#15803d' }}>
+                  <Landmark size={16} />
+                </span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '17px' }}>Raise a Brokerage Bill</h3>
+                  <small style={{ color: '#6b7c77', fontSize: '11px', display: 'block', marginTop: '2px' }}>
+                    Submit commission bill with purchase & bank details for Admin payout
                   </small>
                 </div>
               </div>
+              <button type="button" className="close-btn" onClick={() => setShowRaiseBillModal(false)} title="Close Modal">
+                <X size={18} />
+              </button>
+            </div>
 
-              <div className="payment-actions" style={{ alignItems: 'flex-end' }}>
-                <strong style={{ fontSize: '15px', color: '#111827' }}>
-                  ₹ {Number(p.amount).toLocaleString('en-IN')}
-                </strong>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span className={`status-pill-figma ${(p.status || 'pending').toLowerCase()}`}>
-                    {p.status}
-                  </span>
-                  <select
-                    className="status-dropdown"
-                    style={{ width: 'auto', padding: '3px 8px', fontSize: '11.5px' }}
-                    value={p.status || 'pending'}
-                    onChange={(e) => handleStatusChange(p.id, e.target.value)}
-                    title="Update payment status in MySQL"
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="paid">Mark Paid</option>
-                    <option value="overdue">Overdue</option>
-                  </select>
+            <form onSubmit={handleRaiseBillSubmit}>
+              <div className="modal-scroll-body">
+                {/* SECTION 1: C.P DETAILS */}
+                <div className="form-section-title">
+                  <Building size={15} style={{ color: '#075c4d' }} />
+                  <span>Channel Partner (C.P) Details</span>
+                </div>
+
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '12px 14px', marginBottom: '14px', fontSize: '12.5px', color: '#166534', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px' }}>
+                  <div>
+                    <span style={{ color: '#15803d', fontWeight: '500' }}>Partner Name: </span>
+                    <b>{currentUser.name || 'Channel Partner'}</b>
+                  </div>
+                  <div>
+                    <span style={{ color: '#15803d', fontWeight: '500' }}>Firm: </span>
+                    <b>{currentUser.firm_name || 'Independent Real Estate CP'}</b>
+                  </div>
+                  <div>
+                    <span style={{ color: '#15803d', fontWeight: '500' }}>Phone: </span>
+                    <b>{currentUser.phone || '+91 98200 12345'}</b>
+                  </div>
+                  <div>
+                    <span style={{ color: '#15803d', fontWeight: '500' }}>Email: </span>
+                    <b>{currentUser.email || 'partner@example.com'}</b>
+                  </div>
+                </div>
+
+                {/* SECTION 2: CLIENT & PURCHASE DETAILS */}
+                <div className="form-section-title">
+                  <UserCheck size={15} style={{ color: '#075c4d' }} />
+                  <span>Client & Purchase Details</span>
+                </div>
+
+                <div className="form-grid-2">
+                  <div className="form-field full-col">
+                    <label>Select Client *</label>
+                    <select
+                      value={billForm.client_id}
+                      onChange={(e) => handleClientSelect(e.target.value)}
+                    >
+                      {clients.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({c.phone || 'No phone'}) {c.unit_type ? `— ${c.unit_type}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="form-field full-col">
+                    <label>Client Name (As per Agreement) *</label>
+                    <input
+                      required
+                      placeholder="e.g. Priya Sharma"
+                      value={billForm.client_name}
+                      onChange={(e) => setBillForm({ ...billForm, client_name: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="form-field full-col">
+                    <label>Purchase Details (Unit / Flat / Tower) *</label>
+                    <textarea
+                      rows={2}
+                      required
+                      placeholder="e.g. Flat 402, Tower B - 2 BHK Luxury, Park Solitaire"
+                      value={billForm.purchase_details}
+                      onChange={(e) => setBillForm({ ...billForm, purchase_details: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="form-field">
+                    <label>Agreement Value (₹) *</label>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      placeholder="e.g. 6500000"
+                      value={billForm.agreement_value}
+                      onChange={(e) => setBillForm({ ...billForm, agreement_value: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="form-field">
+                    <label>Brokerage Charge in Percentage (%) *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      min="0.01"
+                      max="100"
+                      placeholder="e.g. 2.0"
+                      value={billForm.brokerage_percent}
+                      onChange={(e) => setBillForm({ ...billForm, brokerage_percent: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                {/* LIVE CALCULATION HIGHLIGHT */}
+                <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '10px', padding: '14px 16px', margin: '12px 0 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <div style={{ fontSize: '11.5px', color: '#047857', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: '600' }}>
+                      Auto-Calculated Total C.P Bill
+                    </div>
+                    <small style={{ color: '#065f46', fontSize: '12px' }}>
+                      {brokerageNum}% of ₹{agreementNum.toLocaleString('en-IN')}
+                    </small>
+                  </div>
+                  <div style={{ fontSize: '22px', color: '#065f46', fontWeight: '800' }}>
+                    ₹ {Number(totalBillCalculated.toFixed(2)).toLocaleString('en-IN')}
+                  </div>
+                </div>
+
+                {/* SECTION 3: C.P BANK DETAILS */}
+                <div className="form-section-title">
+                  <CreditCard size={15} style={{ color: '#075c4d' }} />
+                  <span>C.P Bank Details (Payout Destination)</span>
+                </div>
+
+                <div className="form-grid-2">
+                  <div className="form-field full-col">
+                    <label>Account Details (Bank Name & Account Type) *</label>
+                    <input
+                      required
+                      placeholder="e.g. HDFC Bank - Current Account"
+                      value={billForm.account_details}
+                      onChange={(e) => setBillForm({ ...billForm, account_details: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="form-field full-col">
+                    <label>Account Holder Name *</label>
+                    <input
+                      required
+                      placeholder="e.g. Rahul Sharma / Shree Realty Advisory"
+                      value={billForm.account_holder_name}
+                      onChange={(e) => setBillForm({ ...billForm, account_holder_name: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="form-field full-col">
+                    <label>Account No (Strictly 10 or 12 Digits Only) *</label>
+                    <input
+                      type="text"
+                      required
+                      maxLength={12}
+                      placeholder="Enter 10 or 12 digit bank account number"
+                      value={billForm.account_no}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 12);
+                        setBillForm({ ...billForm, account_no: val });
+                      }}
+                      style={{
+                        borderColor: cleanAcct.length > 0 && !isAcctValid ? '#dc2626' : isAcctValid ? '#16a34a' : undefined
+                      }}
+                    />
+                    {cleanAcct.length === 0 ? (
+                      <small style={{ color: '#6b7c77', fontSize: '11px', display: 'block', marginTop: '4px' }}>
+                        Account number must be strictly 10 or 12 numeric digits.
+                      </small>
+                    ) : !isAcctValid ? (
+                      <small style={{ color: '#dc2626', fontSize: '11px', fontWeight: '600', display: 'block', marginTop: '4px' }}>
+                        ⚠️ Account number must be strictly 10 or 12 digits (currently {cleanAcct.length} digits).
+                      </small>
+                    ) : (
+                      <small style={{ color: '#16a34a', fontSize: '11px', fontWeight: '600', display: 'block', marginTop: '4px' }}>
+                        ✓ Valid {cleanAcct.length}-digit Bank Account Number
+                      </small>
+                    )}
+                  </div>
+
+                  <div className="form-field">
+                    <label>IFSC Code *</label>
+                    <input
+                      required
+                      placeholder="e.g. HDFC0001234"
+                      value={billForm.ifsc_code}
+                      onChange={(e) => setBillForm({ ...billForm, ifsc_code: e.target.value.toUpperCase() })}
+                    />
+                  </div>
+
+                  <div className="form-field">
+                    <label>Branch *</label>
+                    <input
+                      required
+                      placeholder="e.g. FC Road Branch, Pune"
+                      value={billForm.branch}
+                      onChange={(e) => setBillForm({ ...billForm, branch: e.target.value })}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+
+              <div className="modal-footer-actions">
+                <button type="button" className="btn-cancel" onClick={() => setShowRaiseBillModal(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-save"
+                  disabled={!isAcctValid || agreementNum <= 0}
+                  style={{ opacity: !isAcctValid || agreementNum <= 0 ? 0.6 : 1 }}
+                >
+                  <Check size={16} /> Raise a Bill
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
-      <button type="button" className="primary" style={{ marginTop: '16px' }} onClick={() => setShowModal(true)}>
-        + Record Payment
-      </button>
-
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+      {/* MODAL 2: ADMIN MAKE PAYMENT FOR CP BILL */}
+      {showPayoutModal && selectedBillForPayment && (
+        <div className="modal-overlay" onClick={() => setShowPayoutModal(false)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Record New Payment</h3>
-              <button type="button" className="close-btn" onClick={() => setShowModal(false)}><X size={18} /></button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="person" style={{ width: '30px', height: '30px', background: '#dcfce7', color: '#15803d' }}>
+                  <CreditCard size={15} />
+                </span>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '16px' }}>Make Payment to Channel Partner</h3>
+                  <small style={{ color: '#6b7c77', fontSize: '11px' }}>Bill #{selectedBillForPayment.id} — Brokerage Payout</small>
+                </div>
+              </div>
+              <button type="button" className="close-btn" onClick={() => setShowPayoutModal(false)}>
+                <X size={18} />
+              </button>
             </div>
-            <form onSubmit={handleCreate}>
+
+            <form onSubmit={handleAdminPayoutSubmit}>
+              <div className="modal-scroll-body">
+                {/* Payee Details */}
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px 14px', marginBottom: '12px', fontSize: '12.5px' }}>
+                  <div style={{ marginBottom: '6px' }}>
+                    <span style={{ color: '#64748b' }}>Payee Partner: </span>
+                    <strong style={{ color: '#1e293b' }}>{selectedBillForPayment.partner_name}</strong>
+                    {selectedBillForPayment.partner_firm_name && ` (${selectedBillForPayment.partner_firm_name})`}
+                  </div>
+                  <div style={{ marginBottom: '6px' }}>
+                    <span style={{ color: '#64748b' }}>Client & Unit: </span>
+                    <strong>{selectedBillForPayment.client_name}</strong> • {selectedBillForPayment.purchase_details || 'Unit Booking'}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed #cbd5e1', paddingTop: '8px', marginTop: '8px' }}>
+                    <span style={{ color: '#64748b' }}>Payout Amount:</span>
+                    <strong style={{ fontSize: '18px', color: '#075c4d' }}>
+                      ₹ {Number(selectedBillForPayment.total_bill).toLocaleString('en-IN')}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Bank Details of CP */}
+                <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', padding: '12px 14px', marginBottom: '14px', fontSize: '12px', color: '#1e40af' }}>
+                  <div style={{ fontWeight: '700', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <Landmark size={14} /> Bank Account for Payout:
+                  </div>
+                  <div><b>Bank:</b> {selectedBillForPayment.account_details}</div>
+                  <div><b>Holder:</b> {selectedBillForPayment.account_holder_name}</div>
+                  <div><b>A/C No:</b> <code style={{ background: '#dbeafe', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>{selectedBillForPayment.account_no}</code></div>
+                  <div><b>IFSC:</b> {selectedBillForPayment.ifsc_code}</div>
+                  {selectedBillForPayment.branch && <div><b>Branch:</b> {selectedBillForPayment.branch}</div>}
+                </div>
+
+                <div className="form-field" style={{ marginBottom: '12px' }}>
+                  <label>Payment Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={payoutDate}
+                    onChange={(e) => setPayoutDate(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-field" style={{ marginBottom: '12px' }}>
+                  <label>Payment Reference / UTR Number / Transaction ID *</label>
+                  <input
+                    required
+                    placeholder="e.g. UTR-9876543210 / NEFT-CMS8821"
+                    value={payoutRef}
+                    onChange={(e) => setPayoutRef(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer-actions">
+                <button type="button" className="btn-cancel" onClick={() => setShowPayoutModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-save" style={{ background: '#15803d' }}>
+                  <Check size={16} /> Confirm Payment & Mark Paid
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: RECORD CLIENT PAYMENT (Admin Only) */}
+      {showRecordPaymentModal && (
+        <div className="modal-overlay" onClick={() => setShowRecordPaymentModal(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Record Client Payment</h3>
+              <button type="button" className="close-btn" onClick={() => setShowRecordPaymentModal(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleCreatePayment}>
               <div className="modal-scroll-body">
                 <div className="form-field" style={{ marginBottom: '12px' }}>
                   <label>Select Client *</label>
@@ -3828,8 +4948,12 @@ function Payments() {
               </div>
 
               <div className="modal-footer-actions">
-                <button type="button" className="btn-cancel" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn-save"><Check size={16} /> Save Payment</button>
+                <button type="button" className="btn-cancel" onClick={() => setShowRecordPaymentModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-save">
+                  <Check size={16} /> Save Payment
+                </button>
               </div>
             </form>
           </div>

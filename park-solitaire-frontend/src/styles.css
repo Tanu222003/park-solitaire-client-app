@@ -3927,16 +3927,42 @@ input:focus, select:focus, textarea:focus {
   text-transform: capitalize;
 }
 
-.visit-status-pill.status-scheduled {
+.visit-status-pill.status-scheduled,
+.visit-status-pill.status-upcoming {
   background: #fef3c7;
   color: #92400e;
   border: 1px solid #fde68a;
 }
 
-.visit-status-pill.status-completed {
+.visit-status-pill.status-completed,
+.visit-status-pill.status-visited {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.visit-status-pill.status-followup {
+  background: #f3e8ff;
+  color: #7e22ce;
+  border: 1px solid #e9d5ff;
+}
+
+.visit-status-pill.status-revisited {
+  background: #ccfbf1;
+  color: #0f766e;
+  border: 1px solid #99f6e4;
+}
+
+.visit-status-pill.status-booked {
   background: #d1fae5;
   color: #065f46;
   border: 1px solid #6ee7b7;
+}
+
+.visit-status-pill.status-closed {
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #cbd5e1;
 }
 
 .visit-status-pill.status-cancelled {
@@ -4133,4 +4159,314 @@ input:focus, select:focus, textarea:focus {
     justify-content: center;
   }
 }
+
+/* ========================================================
+   SIMPLE CLIENT VISIT JOURNEY TRACKER & MILESTONE STAGES
+   ======================================================== */
+.simple-journey-card,
+.client-visit-journey-container {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  padding: 20px;
+  margin-bottom: 22px;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+.simple-journey-header,
+.journey-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #f0f4f2;
+}
+
+.simple-journey-back-btn,
+.journey-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.simple-journey-back-btn:hover,
+.journey-back-btn:hover {
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.simple-journey-badge-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.simple-journey-step-count {
+  font-size: 12.5px;
+  color: #6b7c77;
+  font-weight: 600;
+}
+
+/* 6-Stage Stepper Grid */
+.simple-stepper-container {
+  margin: 16px 0;
+  width: 100%;
+}
+
+.simple-stepper-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  width: 100%;
+}
+
+.simple-step-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  min-width: 0;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+/* Completed Step */
+.simple-step-item.step-completed {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.simple-step-item.step-completed .simple-step-num {
+  background: #059669;
+  color: #ffffff;
+}
+
+.simple-step-item.step-completed .simple-step-name {
+  color: #166534;
+  font-weight: 600;
+}
+
+/* Active Step */
+.simple-step-item.step-active {
+  background: #075c4d;
+  border-color: #075c4d;
+  box-shadow: 0 2px 8px rgba(7, 92, 77, 0.25);
+}
+
+.simple-step-item.step-active .simple-step-num {
+  background: #ffffff;
+  color: #075c4d;
+  font-weight: 800;
+}
+
+.simple-step-item.step-active .simple-step-name {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.simple-step-curr-tag {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 700;
+  display: inline-block;
+  margin-left: 3px;
+}
+
+/* Pending Step */
+.simple-step-item.step-pending {
+  background: #f9fafb;
+  border-color: #e5e7eb;
+}
+
+.simple-step-item.step-pending .simple-step-num {
+  background: #e5e7eb;
+  color: #6b7280;
+}
+
+.simple-step-item.step-pending .simple-step-name {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* Step Circle / Badge */
+.simple-step-num {
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.simple-step-text {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  gap: 4px;
+}
+
+.simple-step-name {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Responsive Stepper for Tablets and Mobile */
+@media (max-width: 860px) {
+  .simple-stepper-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .simple-stepper-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .simple-journey-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.simple-journey-action-card,
+.journey-admin-controls-card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 18px;
+}
+
+.simple-stage-btn-row,
+.admin-stage-btn-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-stage-quick {
+  padding: 6px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-stage-quick:hover:not(:disabled) {
+  border-color: #075c4d;
+  color: #075c4d;
+  background: #f0fdf4;
+}
+
+.btn-stage-quick.active {
+  background: #075c4d;
+  color: #ffffff;
+  border-color: #075c4d;
+  box-shadow: 0 2px 6px rgba(7, 92, 77, 0.25);
+}
+
+.btn-stage-quick:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cp-readonly-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Visits selector bar at top of Visits view */
+.visit-client-chart-selector-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+  border: 1px solid var(--line);
+  padding: 12px 18px;
+  border-radius: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.client-chart-select {
+  flex: 1;
+  min-width: 220px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 13px;
+  background: #fff;
+  color: #163a33;
+}
+
+.btn-clear-chart-view {
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  color: #4b5563;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-clear-chart-view:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+
+/* Button on visit card to view chart */
+.btn-view-client-chart {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  background: #e6f4f1;
+  color: #075c4d;
+  border: 1px solid #b7dfd6;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-view-client-chart:hover {
+  background: #075c4d;
+  color: #ffffff;
+  border-color: #075c4d;
+}
+
 

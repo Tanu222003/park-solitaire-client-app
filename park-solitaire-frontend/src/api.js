@@ -4,25 +4,42 @@ export function getBaseUrl() {
   const saved = localStorage.getItem("server_api_url");
   if (saved && saved.trim()) return saved.replace(/\/$/, "");
 
-  const env = import.meta.env.VITE_API_URL;
-  if (env && env.trim()) return env.replace(/\/$/, "");
-
   if (typeof window !== "undefined" && window.location) {
+    const isHttps = window.location.protocol === "https:";
     const host = window.location.hostname;
+    const env = import.meta.env.VITE_API_URL;
+
+    if (env && env.trim()) {
+      // Mixed Content prevention: cannot query insecure HTTP backend from HTTPS Vercel domain
+      if (isHttps && env.startsWith("http://")) {
+        return "";
+      }
+      return env.replace(/\/$/, "");
+    }
+
     // If hosted on Vercel, GitHub Pages, or any HTTPS cloud domain without an explicit API URL
     if (
-      window.location.protocol === "https:" ||
+      isHttps ||
       host.includes("vercel.app") ||
       host.includes("github.io") ||
       host.includes("netlify.app")
     ) {
       return ""; // Enables instant demo engine without Mixed Content errors
     }
-    if (host && host !== "localhost" && host !== "127.0.0.1") {
+
+    if (host === "localhost" || host === "127.0.0.1") {
+      return "http://localhost:5001/api";
+    }
+
+    if (host) {
       return `http://${host}:5001/api`;
     }
   }
-  return "http://192.168.1.110:5001/api";
+
+  const env = import.meta.env.VITE_API_URL;
+  if (env && env.trim()) return env.replace(/\/$/, "");
+
+  return "http://localhost:5001/api";
 }
 
 export function getServerUrl() {
@@ -164,7 +181,7 @@ function getInitialDemoStore() {
         visit_date: todayStr,
         visit_time: "11:30 AM",
         notes: "Site tour of 2 BHK luxury show apartment & premium amenities",
-        status: "Scheduled"
+        status: "Upcoming"
       },
       {
         id: 2,
@@ -181,7 +198,7 @@ function getInitialDemoStore() {
         visit_date: todayStr,
         visit_time: "03:00 PM",
         notes: "Family visit for corner 3 BHK unit inquiry & payment schedule",
-        status: "Scheduled"
+        status: "Visited"
       },
       {
         id: 3,
@@ -198,7 +215,7 @@ function getInitialDemoStore() {
         visit_date: tomorrowStr,
         visit_time: "10:30 AM",
         notes: "Follow up discussion on pricing and floor plan review",
-        status: "Scheduled"
+        status: "FollowUp"
       },
       {
         id: 4,
@@ -215,7 +232,24 @@ function getInitialDemoStore() {
         visit_date: tomorrowStr,
         visit_time: "04:30 PM",
         notes: "Penthouse inquiry with builder representative",
-        status: "Scheduled"
+        status: "Revisited"
+      },
+      {
+        id: 5,
+        client_id: 3,
+        client_name: "Rajesh Kulkarni",
+        client_phone: "+91 99887 66554",
+        unit_type: "2 BHK",
+        budget: "₹ 50L - 70L",
+        partner_id: 2,
+        partner_name: "Rahul Sharma",
+        firm_name: "Shree Realty Advisory",
+        partner_phone: "+91 98200 12345",
+        partner_email: "cp@realty.com",
+        visit_date: todayStr,
+        visit_time: "05:00 PM",
+        notes: "Booking amount token verified. Unit 402 blocked.",
+        status: "Booked"
       }
     ],
     complaints: [
@@ -243,6 +277,54 @@ function getInitialDemoStore() {
         partner_id: 2,
         partner_name: "Rahul Sharma"
       }
+    ],
+    bills: [
+      {
+        id: 101,
+        partner_id: 2,
+        partner_name: "Rahul Sharma",
+        partner_firm_name: "Shree Realty Advisory",
+        partner_phone: "+91 98200 12345",
+        partner_email: "cp@realty.com",
+        client_id: 3,
+        client_name: "Rajesh Kulkarni",
+        purchase_details: "Flat 402, Tower B - 2 BHK Premium",
+        agreement_value: 6500000,
+        brokerage_percent: 2.0,
+        total_bill: 130000,
+        account_details: "HDFC Bank - Current A/C",
+        account_holder_name: "Shree Realty Advisory",
+        account_no: "502000123456",
+        ifsc_code: "HDFC0001234",
+        branch: "FC Road, Pune",
+        status: "pending",
+        paid_date: null,
+        payment_reference: null,
+        created_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString()
+      },
+      {
+        id: 102,
+        partner_id: 3,
+        partner_name: "Amit Verma",
+        partner_firm_name: "Verma Properties",
+        partner_phone: "+91 98111 22334",
+        partner_email: "amit@vermaproperties.in",
+        client_id: 4,
+        client_name: "Sneha Patel",
+        purchase_details: "Penthouse Suite 1401 - 4 BHK Luxury",
+        agreement_value: 12000000,
+        brokerage_percent: 2.5,
+        total_bill: 300000,
+        account_details: "ICICI Bank - Current A/C",
+        account_holder_name: "Verma Properties",
+        account_no: "001105001234",
+        ifsc_code: "ICIC0000011",
+        branch: "Sector 18, Noida",
+        status: "paid",
+        paid_date: todayStr,
+        payment_reference: "NEFT-CMS9988231",
+        created_at: new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString()
+      }
     ]
   };
 }
@@ -258,6 +340,9 @@ function loadDemoStore() {
         parsed.visits[0].visit_date = todayStr;
         if (parsed.visits[1]) parsed.visits[1].visit_date = todayStr;
         if (parsed.visits[2]) parsed.visits[2].visit_date = tomorrowStr;
+      }
+      if (!parsed.bills || !Array.isArray(parsed.bills) || parsed.bills.length === 0) {
+        parsed.bills = getInitialDemoStore().bills;
       }
       return parsed;
     }
@@ -336,35 +421,92 @@ function handleMockRequest(endpoint, options = {}) {
     return saved ? JSON.parse(saved) : store.users[0];
   }
 
+  // Current authenticated user context
+  let currentUser = { id: 2, name: 'Rahul Sharma', role: 'partner', firm_name: 'Shree Realty Advisory', phone: '+91 98200 12345', email: 'cp@realty.com' };
+  try {
+    const savedUser = localStorage.getItem("user");
+    if (savedUser) currentUser = JSON.parse(savedUser);
+  } catch {}
+
   // GET /clients
   if (endpoint === "/clients" && method === "GET") {
+    if (currentUser.role === 'partner') {
+      return store.clients.filter(c => Number(c.partner_id) === Number(currentUser.id) || !c.partner_id);
+    }
     return store.clients;
   }
 
   // POST /clients
   if (endpoint === "/clients" && method === "POST") {
+    const partnerId = currentUser.role === 'partner' ? currentUser.id : (body.partner_id || 2);
+    const partnerUser = store.users.find(u => Number(u.id) === Number(partnerId)) || currentUser;
+    const clientStatus = body.status || 'Upcoming Visit';
+
     const newClient = {
       id: Date.now(),
       ...body,
-      status: body.status || "Lead",
+      partner_id: partnerId,
+      partner_name: partnerUser.name || 'Channel Partner',
+      firm_name: partnerUser.firm_name || '',
+      partner_email: partnerUser.email || '',
+      partner_phone: partnerUser.phone || '',
+      partner_phone2: partnerUser.phone2 || '',
+      status: clientStatus,
       created_at: new Date().toISOString()
     };
     store.clients.unshift(newClient);
+
+    // Only Admin can automatically schedule a visit during client creation
+    let scheduledVisit = null;
+    if (body.visit_date && currentUser.role === 'admin') {
+      scheduledVisit = {
+        id: Date.now() + 1,
+        client_id: newClient.id,
+        client_name: newClient.name,
+        client_phone: newClient.phone,
+        client_email: newClient.email,
+        client_address: newClient.address,
+        unit_type: newClient.unit_type,
+        budget: newClient.budget,
+        partner_id: partnerId,
+        partner_name: partnerUser.name || 'Channel Partner',
+        partner_firm_name: partnerUser.firm_name || '',
+        partner_phone: partnerUser.phone || '',
+        partner_phone2: partnerUser.phone2 || '',
+        partner_email: partnerUser.email || '',
+        visit_date: body.visit_date,
+        visit_time: body.visit_time || '11:00 AM',
+        notes: body.visit_notes || 'Site visit scheduled during client onboarding',
+        status: 'scheduled',
+        created_at: new Date().toISOString()
+      };
+      store.visits.unshift(scheduledVisit);
+    }
+
     saveDemoStore(store);
-    return newClient;
+    return { ...newClient, scheduled_visit: scheduledVisit };
   }
 
   // GET /clients/:id
   if (endpoint.startsWith("/clients/") && method === "GET") {
     const id = parseInt(endpoint.split("/")[2]);
-    const found = store.clients.find((c) => c.id === id);
-    return found || store.clients[0];
+    const found = store.clients.find((c) => Number(c.id) === id);
+    if (!found) return store.clients[0];
+    const clientVisits = (store.visits || []).filter((v) => Number(v.client_id) === id);
+    const clientComplaints = (store.complaints || []).filter((c) => Number(c.client_id) === id);
+    const clientPayments = (store.payments || []).filter((p) => Number(p.client_id) === id);
+    return {
+      ...found,
+      visits: clientVisits,
+      complaints: clientComplaints,
+      payments: clientPayments
+    };
   }
 
   // PUT /clients/:id
   if (endpoint.startsWith("/clients/") && method === "PUT") {
     const id = parseInt(endpoint.split("/")[2]);
-    const idx = store.clients.findIndex((c) => c.id === id);
+    const idx = store.clients.findIndex((c) => Number(c.id) === id);
     if (idx !== -1) {
       store.clients[idx] = { ...store.clients[idx], ...body };
       saveDemoStore(store);
@@ -375,17 +517,50 @@ function handleMockRequest(endpoint, options = {}) {
 
   // GET /visits
   if (endpoint === "/visits" && method === "GET") {
+    if (currentUser.role === 'partner') {
+      return store.visits.filter(v => Number(v.partner_id) === Number(currentUser.id) || !v.partner_id);
+    }
     return store.visits;
   }
 
   // POST /visits
   if (endpoint === "/visits" && method === "POST") {
+    if (currentUser.role !== 'admin') {
+      throw new Error('Channel Partners cannot schedule visits. Only Admin can schedule visits.');
+    }
+    const clientId = Number(body.client_id);
+    const client = store.clients.find(c => Number(c.id) === clientId);
+    const partnerId = client?.partner_id || (currentUser.role === 'partner' ? currentUser.id : 2);
+    const partnerUser = store.users.find(u => Number(u.id) === Number(partnerId)) || currentUser;
+
     const newVisit = {
       id: Date.now(),
-      ...body,
-      status: body.status || "Scheduled"
+      client_id: clientId,
+      client_name: client?.name || body.client_name || 'Client Visit',
+      client_phone: client?.phone || body.client_phone || '',
+      client_email: client?.email || body.client_email || '',
+      client_address: client?.address || '',
+      unit_type: client?.unit_type || body.unit_type || '',
+      budget: client?.budget || body.budget || '',
+      partner_id: partnerId,
+      partner_name: client?.partner_name || partnerUser.name || 'Channel Partner',
+      partner_firm_name: client?.firm_name || partnerUser.firm_name || '',
+      partner_phone: client?.partner_phone || partnerUser.phone || '',
+      partner_phone2: client?.partner_phone2 || partnerUser.phone2 || '',
+      partner_email: client?.partner_email || partnerUser.email || '',
+      visit_date: body.visit_date,
+      visit_time: body.visit_time || '11:00 AM',
+      notes: body.notes || '',
+      status: body.status || 'Upcoming',
+      created_at: new Date().toISOString()
     };
     store.visits.unshift(newVisit);
+
+    // Update client status if needed
+    if (client && (client.status === 'Pending' || !client.status)) {
+      client.status = 'Site Visit Planned';
+    }
+
     saveDemoStore(store);
     return newVisit;
   }
@@ -393,7 +568,7 @@ function handleMockRequest(endpoint, options = {}) {
   // PUT /visits/:id
   if (endpoint.startsWith("/visits/") && method === "PUT") {
     const id = parseInt(endpoint.split("/")[2]);
-    const idx = store.visits.findIndex((v) => v.id === id);
+    const idx = store.visits.findIndex((v) => Number(v.id) === id);
     if (idx !== -1) {
       store.visits[idx] = { ...store.visits[idx], ...body };
       saveDemoStore(store);
@@ -404,6 +579,9 @@ function handleMockRequest(endpoint, options = {}) {
 
   // GET /complaints
   if (endpoint === "/complaints" && method === "GET") {
+    if (currentUser.role === 'partner') {
+      return store.complaints.filter(c => Number(c.partner_id) === Number(currentUser.id));
+    }
     return store.complaints;
   }
 
@@ -423,7 +601,7 @@ function handleMockRequest(endpoint, options = {}) {
   // PUT /complaints/:id
   if (endpoint.startsWith("/complaints/") && method === "PUT") {
     const id = parseInt(endpoint.split("/")[2]);
-    const idx = store.complaints.findIndex((c) => c.id === id);
+    const idx = store.complaints.findIndex((c) => Number(c.id) === id);
     if (idx !== -1) {
       store.complaints[idx] = { ...store.complaints[idx], ...body };
       saveDemoStore(store);
@@ -434,6 +612,9 @@ function handleMockRequest(endpoint, options = {}) {
 
   // GET /payments
   if (endpoint === "/payments" && method === "GET") {
+    if (currentUser.role === 'partner') {
+      return store.payments.filter(p => Number(p.partner_id) === Number(currentUser.id));
+    }
     return store.payments;
   }
 
@@ -452,7 +633,7 @@ function handleMockRequest(endpoint, options = {}) {
   // PUT /payments/:id
   if (endpoint.startsWith("/payments/") && method === "PUT") {
     const id = parseInt(endpoint.split("/")[2]);
-    const idx = store.payments.findIndex((p) => p.id === id);
+    const idx = store.payments.findIndex((p) => Number(p.id) === id);
     if (idx !== -1) {
       store.payments[idx] = { ...store.payments[idx], ...body };
       saveDemoStore(store);
@@ -461,14 +642,82 @@ function handleMockRequest(endpoint, options = {}) {
     return body;
   }
 
+  // GET /bills
+  if (endpoint === "/bills" && method === "GET") {
+    if (currentUser.role === 'partner') {
+      return (store.bills || []).filter(b => Number(b.partner_id) === Number(currentUser.id));
+    }
+    return store.bills || [];
+  }
+
+  // POST /bills
+  if (endpoint === "/bills" && method === "POST") {
+    const agreement = Number(body.agreement_value) || 0;
+    const brokerage = Number(body.brokerage_percent) || 0;
+    const total = Number(((agreement * brokerage) / 100).toFixed(2));
+    const newBill = {
+      id: Date.now(),
+      partner_id: currentUser.role === 'partner' ? currentUser.id : (body.partner_id || 2),
+      partner_name: currentUser.name || "Channel Partner",
+      partner_firm_name: currentUser.firm_name || "Realty Advisory",
+      partner_phone: currentUser.phone || "+91 98200 12345",
+      partner_email: currentUser.email || "cp@realty.com",
+      client_id: body.client_id || null,
+      client_name: body.client_name || "Client",
+      purchase_details: body.purchase_details || "",
+      agreement_value: agreement,
+      brokerage_percent: brokerage,
+      total_bill: total,
+      account_details: body.account_details || "",
+      account_holder_name: body.account_holder_name || currentUser.name,
+      account_no: String(body.account_no || '').trim(),
+      ifsc_code: String(body.ifsc_code || '').trim().toUpperCase(),
+      branch: body.branch || "",
+      status: "pending",
+      paid_date: null,
+      payment_reference: null,
+      created_at: new Date().toISOString()
+    };
+    if (!store.bills) store.bills = [];
+    store.bills.unshift(newBill);
+    saveDemoStore(store);
+    return newBill;
+  }
+
+  // PUT /bills/:id/pay
+  if (endpoint.startsWith("/bills/") && endpoint.endsWith("/pay") && method === "PUT") {
+    const id = parseInt(endpoint.split("/")[2]);
+    const idx = (store.bills || []).findIndex(b => Number(b.id) === id);
+    if (idx !== -1) {
+      store.bills[idx] = {
+        ...store.bills[idx],
+        status: "paid",
+        paid_date: body.paid_date || new Date().toISOString().slice(0, 10),
+        payment_reference: body.payment_reference || "Online Payout"
+      };
+      saveDemoStore(store);
+      return store.bills[idx];
+    }
+    return { status: "paid" };
+  }
+
   // GET /admin/dashboard
   if (endpoint === "/admin/dashboard") {
+    const scheduled = store.visits.filter((v) => (v.status || '').toLowerCase() === 'scheduled').length;
     return {
+      totalPartners: store.users.filter((u) => u.role === "partner").length,
+      totalClients: store.clients.length,
+      totalVisits: store.visits.length,
+      openComplaints: store.complaints.filter((c) => (c.status || '').toLowerCase() !== 'resolved').length,
+      pendingPayments: 0,
+      totalPaid: 0,
       stats: {
         totalPartners: store.users.filter((u) => u.role === "partner").length,
+        totalClients: store.clients.length,
+        totalVisits: store.visits.length,
         activeClients: store.clients.length,
         totalBookings: store.clients.filter((c) => c.status === "Booking Done").length,
-        scheduledVisits: store.visits.filter((v) => v.status === "Scheduled").length
+        scheduledVisits: scheduled
       },
       recentClients: store.clients.slice(0, 5),
       recentVisits: store.visits.slice(0, 5),
@@ -608,6 +857,20 @@ export const api = {
     request(`/payments/${id}`, {
       method: "PUT",
       body: JSON.stringify(data)
+    }),
+
+  getBills: () => request("/bills"),
+
+  createBill: (data) =>
+    request("/bills", {
+      method: "POST",
+      body: JSON.stringify(data)
+    }),
+
+  payBill: (id, data) =>
+    request(`/bills/${id}/pay`, {
+      method: "PUT",
+      body: JSON.stringify(data || {})
     }),
 
   getAdminDashboard: () => request("/admin/dashboard"),

@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS visits (
   visit_date DATE NOT NULL,
   visit_time VARCHAR(20) NULL,
   notes      TEXT,
-  status     ENUM('scheduled', 'completed', 'cancelled') NOT NULL DEFAULT 'scheduled',
+  status     VARCHAR(50) NOT NULL DEFAULT 'Upcoming',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (client_id)  REFERENCES clients(id) ON DELETE CASCADE,
@@ -81,4 +81,26 @@ CREATE TABLE IF NOT EXISTS payments (
   FOREIGN KEY (partner_id) REFERENCES users(id)   ON DELETE CASCADE,
   INDEX idx_payments_client (client_id),
   INDEX idx_payments_partner (partner_id)
+);
+
+CREATE TABLE IF NOT EXISTS bills (
+  id                  INT AUTO_INCREMENT PRIMARY KEY,
+  partner_id          INT NOT NULL,
+  client_id           INT NULL,
+  client_name         VARCHAR(150) NOT NULL,
+  purchase_details    TEXT,
+  agreement_value     DECIMAL(15, 2) NOT NULL,
+  brokerage_percent   DECIMAL(5, 2) NOT NULL,
+  total_bill          DECIMAL(15, 2) NOT NULL,
+  account_details     VARCHAR(150),
+  account_holder_name VARCHAR(150),
+  account_no          VARCHAR(30) NOT NULL,
+  ifsc_code           VARCHAR(30),
+  branch              VARCHAR(150),
+  status              ENUM('pending', 'paid', 'rejected') NOT NULL DEFAULT 'pending',
+  paid_date           DATE NULL,
+  payment_reference   VARCHAR(100) NULL,
+  created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (partner_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_bills_partner (partner_id)
 );

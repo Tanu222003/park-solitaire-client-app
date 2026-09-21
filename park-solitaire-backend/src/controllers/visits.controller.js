@@ -22,7 +22,7 @@ export async function getVisits(req, res, next) {
              u.phone2 AS partner_phone2,
              u.email AS partner_email
       FROM visits v
-      JOIN clients c ON c.id = v.client_id
+      LEFT JOIN clients c ON c.id = v.client_id
       LEFT JOIN users u ON u.id = v.partner_id
       ${isAdmin ? '' : 'WHERE v.partner_id = ?'}
       ORDER BY v.visit_date DESC, v.id DESC
@@ -56,6 +56,10 @@ export function getVisitAlertMessage(visit, authorName, action = 'scheduled') {
 
 export async function createVisit(req, res, next) {
   try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Channel Partners cannot schedule visits. Only Admin can schedule visits.' });
+    }
+
     const { client_id, visit_date, visit_time, notes, status } = req.body || {};
     if (!client_id || !visit_date) {
       return res.status(400).json({ message: 'client_id and visit_date are required' });
@@ -71,7 +75,7 @@ export async function createVisit(req, res, next) {
 
     const [result] = await pool.query(
       'INSERT INTO visits (client_id, partner_id, visit_date, visit_time, notes, status) VALUES (?, ?, ?, ?, ?, ?)',
-      [client_id, partnerId, visit_date, visit_time || null, notes || null, status || 'scheduled']
+      [client_id, partnerId, visit_date, visit_time || null, notes || null, status || 'Upcoming']
     );
     const [rows] = await pool.query(`
       SELECT v.*,
@@ -91,7 +95,7 @@ export async function createVisit(req, res, next) {
              u.phone2 AS partner_phone2,
              u.email AS partner_email
       FROM visits v
-      JOIN clients c ON c.id = v.client_id
+      LEFT JOIN clients c ON c.id = v.client_id
       LEFT JOIN users u ON u.id = v.partner_id
       WHERE v.id = ?
     `, [result.insertId]);
@@ -111,12 +115,13 @@ export async function createVisit(req, res, next) {
 
 export async function updateVisit(req, res, next) {
   try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Only Admin has authority to update visit status.' });
+    }
+
     const { visit_date, visit_time, notes, status } = req.body || {};
     const [existing] = await pool.query('SELECT partner_id FROM visits WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ message: 'Visit not found' });
-    if (req.user.role !== 'admin' && Number(existing[0].partner_id) !== Number(req.user.id)) {
-      return res.status(403).json({ message: 'Not your visit' });
-    }
 
     await pool.query(
       `UPDATE visits SET
@@ -146,7 +151,7 @@ export async function updateVisit(req, res, next) {
              u.phone2 AS partner_phone2,
              u.email AS partner_email
       FROM visits v
-      JOIN clients c ON c.id = v.client_id
+      LEFT JOIN clients c ON c.id = v.client_id
       LEFT JOIN users u ON u.id = v.partner_id
       WHERE v.id = ?
     `, [req.params.id]);

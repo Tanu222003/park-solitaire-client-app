@@ -36,3 +36,5 @@ build/
 *.keystore
 local.properties
 **/local.properties
+.vercel
+.env*

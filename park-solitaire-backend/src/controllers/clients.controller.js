@@ -33,7 +33,13 @@ export async function getClientById(req, res, next) {
       return res.status(403).json({ message: 'Not your client' });
     }
 
-    const [visits] = await pool.query('SELECT * FROM visits WHERE client_id = ? ORDER BY visit_date DESC', [client.id]);
+    const [visits] = await pool.query(`
+      SELECT v.*, u.name AS partner_name, u.firm_name AS partner_firm_name, u.phone AS partner_phone, u.phone2 AS partner_phone2, u.email AS partner_email
+      FROM visits v
+      LEFT JOIN users u ON u.id = v.partner_id
+      WHERE v.client_id = ?
+      ORDER BY v.visit_date DESC, v.id DESC
+    `, [client.id]);
     const [complaints] = await pool.query('SELECT * FROM complaints WHERE client_id = ? ORDER BY created_at DESC', [client.id]);
     const [payments] = await pool.query('SELECT * FROM payments WHERE client_id = ? ORDER BY created_at DESC', [client.id]);
 
@@ -61,8 +67,8 @@ export async function createClient(req, res, next) {
 
     if (!name) return res.status(400).json({ message: 'name is required' });
 
-    // If a visit is scheduled along with client, status defaults to 'Site Visit Planned' unless explicitly passed
-    const clientStatus = status || (visit_date ? 'Site Visit Planned' : 'Pending');
+    // Pipeline status defaults to 'Upcoming Visit'
+    const clientStatus = status || 'Upcoming Visit';
 
     const [result] = await pool.query(
       'INSERT INTO clients (partner_id, name, phone, email, address, unit_type, budget, source, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -80,12 +86,12 @@ export async function createClient(req, res, next) {
 
     const createdClient = rows[0];
 
-    // If CP or Admin specified visit_date, automatically schedule the visit!
+    // Only Admin can automatically schedule a visit during client creation
     let scheduledVisit = null;
-    if (visit_date) {
+    if (visit_date && req.user.role === 'admin') {
       const [vResult] = await pool.query(
         'INSERT INTO visits (client_id, partner_id, visit_date, visit_time, notes, status) VALUES (?, ?, ?, ?, ?, ?)',
-        [clientId, req.user.id, visit_date, visit_time || null, visit_notes || null, 'scheduled']
+        [clientId, req.user.id, visit_date, visit_time || null, visit_notes || null, 'Upcoming']
       );
 
       const [vRows] = await pool.query(`
@@ -106,7 +112,7 @@ export async function createClient(req, res, next) {
                u.phone2 AS partner_phone2,
                u.email AS partner_email
         FROM visits v
-        JOIN clients c ON c.id = v.client_id
+        LEFT JOIN clients c ON c.id = v.client_id
         LEFT JOIN users u ON u.id = v.partner_id
         WHERE v.id = ?
       `, [vResult.insertId]);

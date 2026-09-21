@@ -9,6 +9,7 @@ import clientsRoutes from './src/routes/clients.routes.js';
 import visitsRoutes from './src/routes/visits.routes.js';
 import complaintsRoutes from './src/routes/complaints.routes.js';
 import paymentsRoutes from './src/routes/payments.routes.js';
+import billsRoutes from './src/routes/bills.routes.js';
 import adminRoutes from './src/routes/admin.routes.js';
 import { addClient } from './src/config/events.js';
 import { errorHandler, notFound } from './src/middleware/errorHandler.js';
@@ -68,6 +69,7 @@ app.use('/api/clients', clientsRoutes);
 app.use('/api/visits', visitsRoutes);
 app.use('/api/complaints', complaintsRoutes);
 app.use('/api/payments', paymentsRoutes);
+app.use('/api/bills', billsRoutes);
 app.use('/api/admin', adminRoutes);
 
 app.use(notFound);
