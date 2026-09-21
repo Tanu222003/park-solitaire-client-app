@@ -2328,16 +2328,25 @@ function ClientVisitJourneyChart({
   }
 
   const currentStageObj = STAGES[currentStageIndex];
+  const progressPercent = Math.round(((currentStageIndex + 1) / STAGES.length) * 100);
+
+  const visitsByStage = {};
+  STAGES.forEach((s) => { visitsByStage[s.key] = []; });
+  visits.forEach((v) => {
+    const idx = getStageIndex(v.status);
+    const key = STAGES[idx].key;
+    visitsByStage[key].push(v);
+  });
 
   return (
-    <div className="simple-journey-card">
+    <div className="client-visit-journey-container">
       {/* Header Bar */}
-      <div className="simple-journey-header">
+      <div className="journey-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           {onBack && (
             <button
               type="button"
-              className="simple-journey-back-btn"
+              className="journey-back-btn"
               onClick={onBack}
               title="Return to site visit records list"
             >
@@ -2362,42 +2371,68 @@ function ClientVisitJourneyChart({
           </div>
         </div>
 
-        <div className="simple-journey-badge-wrap">
-          <span className="simple-journey-step-count">
-            Stage <b>{currentStageIndex + 1}</b> of <b>{STAGES.length}</b>
-          </span>
+        <div className="journey-progress-badge">
+          <div className="progress-fraction">
+            Stage <strong>{currentStageIndex + 1}</strong> of <strong>{STAGES.length}</strong>
+          </div>
+          <div className="progress-percentage-pill">{progressPercent}% Journey Progress</div>
         </div>
       </div>
 
-      {/* Simple 6-Stage Pipeline Tracker */}
-      <div className="simple-stepper-container">
-        <div className="simple-stepper-grid">
-          {STAGES.map((st, idx) => {
-            const isDone = idx < currentStageIndex;
-            const isCurrent = idx === currentStageIndex;
+      {/* Progress Track */}
+      <div className="journey-progress-bar-track">
+        <div
+          className="journey-progress-bar-fill"
+          style={{ width: `${progressPercent}%` }}
+        />
+      </div>
 
-            let stepClass = 'step-pending';
-            if (isDone) stepClass = 'step-completed';
-            if (isCurrent) stepClass = 'step-active';
+      {/* Round Circular Flowchart for Admin and C.P */}
+      <div className="journey-chart-flow-wrap">
+        <div className="journey-chart-flow">
+          {STAGES.map((st, idx) => {
+            const isCompleted = idx < currentStageIndex;
+            const isCurrent = idx === currentStageIndex;
+            const isPending = idx > currentStageIndex;
+            const matchingVisits = visitsByStage[st.key] || [];
 
             return (
               <div
                 key={st.key}
-                className={`simple-step-item ${stepClass}`}
+                className={`journey-step-node ${isCompleted ? 'step-completed' : ''} ${isCurrent ? 'step-current' : ''} ${isPending ? 'step-pending' : ''}`}
                 onClick={() => {
                   if (isAdmin && visits.length > 0 && onUpdateStatus) {
                     onUpdateStatus(visits[0].id, st.key);
                   }
                 }}
                 style={{ cursor: isAdmin && visits.length > 0 ? 'pointer' : 'default' }}
-                title={isAdmin ? `Click to set client stage to ${st.title}` : st.title}
+                title={isAdmin ? `Click to advance client visit stage to ${st.title}` : st.title}
               >
-                <div className="simple-step-num">
-                  {isDone ? <Check size={14} strokeWidth={3} /> : idx + 1}
+                {idx < STAGES.length - 1 && (
+                  <div className={`step-connector ${idx < currentStageIndex ? 'connector-done' : ''}`} />
+                )}
+
+                <div className="step-circle">
+                  {isCompleted ? (
+                    <Check size={16} strokeWidth={3} />
+                  ) : isCurrent ? (
+                    <span className="step-pulse-dot" />
+                  ) : (
+                    <span>{idx + 1}</span>
+                  )}
                 </div>
-                <div className="simple-step-text">
-                  <span className="simple-step-name">{st.title}</span>
-                  {isCurrent && <span className="simple-step-curr-tag">Active</span>}
+
+                <div className="step-content">
+                  <div className="step-title">
+                    {st.title}
+                    {isCurrent && <span className="round-active-badge">Active</span>}
+                  </div>
+                  {matchingVisits.length > 0 && (
+                    <div className="step-event-chip">
+                      📅 {new Date(matchingVisits[0].visit_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                      {matchingVisits[0].visit_time ? ` • ${matchingVisits[0].visit_time}` : ''}
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -2406,18 +2441,18 @@ function ClientVisitJourneyChart({
       </div>
 
       {/* Admin Quick Action Controls or CP Read-Only Notice */}
-      <div className="simple-journey-action-card">
+      <div className="journey-admin-controls-card">
         {isAdmin ? (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
               <span style={{ fontSize: '12px', fontWeight: '700', color: '#163a33' }}>
-                ⚡ Admin: Click to Advance Stage:
+                ⚡ Admin: Click Stage in Round Flowchart or Select Below:
               </span>
               <small style={{ color: '#6b7c77', fontSize: '11px' }}>
                 Updates client visit status in MySQL
               </small>
             </div>
-            <div className="simple-stage-btn-row">
+            <div className="admin-stage-btn-row">
               {STAGES.map((st) => (
                 <button
                   key={st.key}
@@ -2442,7 +2477,7 @@ function ClientVisitJourneyChart({
               👁️ Channel Partner Status:
             </span>
             <span style={{ fontSize: '12.5px', color: '#4b5563', marginLeft: '6px' }}>
-              Current stage is <b>{currentStageObj.title}</b> (Stage {currentStageIndex + 1} of 6). Status is managed by Admin.
+              Current stage is <b>{currentStageObj.title}</b> (Stage {currentStageIndex + 1} of 6, {progressPercent}% completed). Status is managed by Admin.
             </span>
           </div>
         )}
