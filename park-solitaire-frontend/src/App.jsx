@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Routes, Route, Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Routes, Route, Link, useLocation, useNavigate, useParams, Navigate } from 'react-router-dom';
 import {
   ArrowLeft, Bell, CalendarDays, Check, CheckCircle2, ChevronRight,
   CircleDollarSign, ClipboardList, Edit, FileWarning, Home, Lock,
@@ -475,6 +475,81 @@ function Login() {
           {loading ? 'Verifying...' : role === 'admin' ? 'Verify & Continue' : 'Login'}
         </button>
       </form>
+
+      {/* 1-Click Demo Quick Logins */}
+      <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px dashed #e2e8f0' }}>
+        <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'center', marginBottom: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          ⚡ 1-Click Instant Demo Login
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+          <button
+            type="button"
+            className="btn-sm"
+            style={{
+              padding: '8px 10px',
+              background: '#075c4d',
+              color: '#ffffff',
+              borderRadius: '8px',
+              fontSize: '11.5px',
+              fontWeight: '600',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px'
+            }}
+            onClick={async () => {
+              setLoading(true);
+              try {
+                const res = await api.login({ email: 'admin@parksolitaire.com', password: 'admin' });
+                localStorage.setItem('token', res.token);
+                localStorage.setItem('user', JSON.stringify(res.user));
+                navigate('/admin/dashboard');
+              } catch (err) {
+                setError(err.message || 'Login failed');
+              } finally {
+                setLoading(false);
+              }
+            }}
+          >
+            🛡️ Admin Login
+          </button>
+          <button
+            type="button"
+            className="btn-sm"
+            style={{
+              padding: '8px 10px',
+              background: '#0f766e',
+              color: '#ffffff',
+              borderRadius: '8px',
+              fontSize: '11.5px',
+              fontWeight: '600',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '4px'
+            }}
+            onClick={async () => {
+              setLoading(true);
+              try {
+                const res = await api.login({ email: 'cp@realty.com', password: '123' });
+                localStorage.setItem('token', res.token);
+                localStorage.setItem('user', JSON.stringify(res.user));
+                navigate('/partner/dashboard');
+              } catch (err) {
+                setError(err.message || 'Login failed');
+              } finally {
+                setLoading(false);
+              }
+            }}
+          >
+            🤝 C.P Login
+          </button>
+        </div>
+      </div>
 
       {role === 'partner' ? (
         <div className="foot">
@@ -1155,17 +1230,6 @@ function ClientVisitsWidget({
         </div>
 
         <div className="upcoming-visits-actions">
-          {admin && (
-            <button
-              type="button"
-              className="btn-quick-schedule"
-              onClick={() => onOpenSchedule(activeTab === 'all' ? 'today' : activeTab)}
-              title="Schedule a visit"
-            >
-              <Plus size={15} />
-              <span>Schedule Visit</span>
-            </button>
-          )}
           <Link to={`${prefix}/visits`} className="view-all-link">
             All Visits ({visits.length})
           </Link>
@@ -1232,15 +1296,6 @@ function ClientVisitsWidget({
                 ? 'No client visits booked for tomorrow yet.'
                 : 'No site visits recorded in the system yet.'}
             </p>
-            {admin && (
-              <button
-                type="button"
-                className="btn-primary-compact"
-                onClick={() => onOpenSchedule(activeTab === 'all' ? 'today' : activeTab)}
-              >
-                <Plus size={14} /> Schedule {activeTab === 'today' ? "Today's" : activeTab === 'tomorrow' ? "Tomorrow's" : "New"} Visit
-              </button>
-            )}
           </div>
         ) : (
           currentList.map((v) => {
@@ -1435,7 +1490,11 @@ function Dashboard({ admin = false }) {
       loadDashboardData();
     };
     window.addEventListener('portal-refresh', handleRefresh);
-    return () => window.removeEventListener('portal-refresh', handleRefresh);
+    window.addEventListener('storage', handleRefresh);
+    return () => {
+      window.removeEventListener('portal-refresh', handleRefresh);
+      window.removeEventListener('storage', handleRefresh);
+    };
   }, [admin]);
 
   const handleUpdateVisitStatus = async (visitId, newStatus) => {
@@ -1894,16 +1953,25 @@ function Dashboard({ admin = false }) {
 
 function Clients() {
   const { openUserDetails } = useUserModal();
+  const location = useLocation();
   const userStr = localStorage.getItem('user');
   let user = { role: 'partner' };
   try { if (userStr) user = JSON.parse(userStr); } catch {}
-  const isAdmin = user.role === 'admin';
+  const isAdmin = location.pathname.startsWith('/admin') || user.role === 'admin';
   const prefix = isAdmin ? '/admin' : '/partner';
 
   const [clients, setClients] = useState([]);
   const [q, setQ] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const tomorrowObj = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const tomorrowStr = `${tomorrowObj.getFullYear()}-${pad(tomorrowObj.getMonth() + 1)}-${pad(tomorrowObj.getDate())}`;
+  const dayAfterObj = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+  const dayAfterStr = `${dayAfterObj.getFullYear()}-${pad(dayAfterObj.getMonth() + 1)}-${pad(dayAfterObj.getDate())}`;
 
   const initialClientForm = {
     name: '',
@@ -1913,20 +1981,12 @@ function Clients() {
     unit_type: '1 BHK',
     budget: '₹ 50L - 70L',
     status: 'Upcoming Visit',
-    visit_date: '',
-    visit_time: '',
+    visit_date: todayStr,
+    visit_time: '11:00 AM',
     visit_notes: ''
   };
 
   const [newClient, setNewClient] = useState(initialClientForm);
-
-  const now = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  const tomorrowObj = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  const tomorrowStr = `${tomorrowObj.getFullYear()}-${pad(tomorrowObj.getMonth() + 1)}-${pad(tomorrowObj.getDate())}`;
-  const dayAfterObj = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-  const dayAfterStr = `${dayAfterObj.getFullYear()}-${pad(dayAfterObj.getMonth() + 1)}-${pad(dayAfterObj.getDate())}`;
 
   const loadClients = (showSpinner = true) => {
     if (showSpinner) setLoading(true);
@@ -1940,7 +2000,11 @@ function Clients() {
     loadClients(true);
     const handleRefresh = () => loadClients(false);
     window.addEventListener('portal-refresh', handleRefresh);
-    return () => window.removeEventListener('portal-refresh', handleRefresh);
+    window.addEventListener('storage', handleRefresh);
+    return () => {
+      window.removeEventListener('portal-refresh', handleRefresh);
+      window.removeEventListener('storage', handleRefresh);
+    };
   }, []);
 
   const handleCreate = async (e) => {
@@ -2061,9 +2125,7 @@ function Clients() {
                 <div>
                   <h3 style={{ margin: 0, fontSize: '17px' }}>Add New Client</h3>
                   <small style={{ color: '#6b7c77', fontSize: '11px', display: 'block', marginTop: '2px' }}>
-                    {isAdmin
-                      ? 'Register client profile & optionally schedule their property visit'
-                      : 'Register client profile with unit requirement and contact details'}
+                    Register client profile &amp; schedule their property visit
                   </small>
                 </div>
               </div>
@@ -2154,121 +2216,138 @@ function Clients() {
                   </div>
                 </div>
 
-                {/* Section 2: Optional Site Visit Scheduling (Admin Only) */}
-                {isAdmin && (
-                  <div className="client-visit-schedule-section">
-                    <div className="visit-schedule-header">
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <CalendarDays size={16} style={{ color: '#166534' }} />
-                          <strong>Schedule Site Visit (Date & Time)</strong>
-                        </div>
-                        <span className="optional-tag">Optional</span>
+                {/* Section 2: Site Visit Scheduling (When is the client visiting?) */}
+                <div className="client-visit-schedule-section">
+                  <div className="visit-schedule-header">
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <CalendarDays size={16} style={{ color: '#166534' }} />
+                        <strong>Schedule Site Visit (Date &amp; Time)</strong>
                       </div>
-                      <small>
-                        Specify when this client will visit. If scheduled for tomorrow, it will alert Admin and appear on Tomorrow's Visit Radar instantly!
-                      </small>
+                      <span className="optional-tag">Visit Details</span>
                     </div>
+                    <small>
+                      Specify when this client is arriving for their property visit. Quick buttons for Today / Tomorrow or pick a date:
+                    </small>
+                  </div>
 
-                    <div className="visit-date-quick-chips">
-                      <button
-                        type="button"
-                        className={`chip ${newClient.visit_date === todayStr ? 'active' : ''}`}
-                        onClick={() => setNewClient({ ...newClient, visit_date: todayStr, status: 'Upcoming Visit' })}
-                      >
-                        📅 Today
-                      </button>
-                      <button
-                        type="button"
-                        className={`chip ${newClient.visit_date === tomorrowStr ? 'active' : ''}`}
-                        onClick={() => setNewClient({ ...newClient, visit_date: tomorrowStr, status: 'Upcoming Visit' })}
-                      >
-                        ⚡ Tomorrow
-                      </button>
-                      <button
-                        type="button"
-                        className={`chip ${newClient.visit_date === dayAfterStr ? 'active' : ''}`}
-                        onClick={() => setNewClient({ ...newClient, visit_date: dayAfterStr, status: 'Upcoming Visit' })}
-                      >
-                        🗓️ In 2 Days
-                      </button>
-                      {newClient.visit_date && (
-                        <button
-                          type="button"
-                          className="chip clear-chip"
-                          onClick={() => setNewClient({ ...newClient, visit_date: '', visit_time: '', visit_notes: '' })}
-                        >
-                          ✕ Clear Visit
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="form-grid-2" style={{ marginBottom: '10px' }}>
-                      <div className="form-field">
-                        <label style={{ fontSize: '11px', fontWeight: '600', color: '#166534' }}>Visit Date</label>
-                        <input
-                          type="date"
-                          min={todayStr}
-                          value={newClient.visit_date}
-                          onChange={(e) => setNewClient({
-                            ...newClient,
-                            visit_date: e.target.value,
-                            status: 'Upcoming Visit'
-                          })}
-                        />
-                      </div>
-                      <div className="form-field">
-                        <label style={{ fontSize: '11px', fontWeight: '600', color: '#166534' }}>Visit Time</label>
-                        <input
-                          type="time"
-                          value={newClient.visit_time}
-                          onChange={(e) => setNewClient({ ...newClient, visit_time: e.target.value })}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="time-presets-row">
-                      <span className="time-preset-label">Quick Times:</span>
-                      {['10:30', '11:30', '14:00', '16:00', '17:30'].map((t) => (
-                        <button
-                          key={t}
-                          type="button"
-                          className={`time-preset-btn ${newClient.visit_time === t ? 'active' : ''}`}
-                          onClick={() => setNewClient({ ...newClient, visit_time: t })}
-                        >
-                          {t === '10:30' ? '10:30 AM' : t === '11:30' ? '11:30 AM' : t === '14:00' ? '02:00 PM' : t === '16:00' ? '04:00 PM' : '05:30 PM'}
-                        </button>
-                      ))}
-                    </div>
-
+                  <div className="visit-date-quick-chips">
+                    <button
+                      type="button"
+                      className={`chip ${newClient.visit_date === todayStr ? 'active' : ''}`}
+                      onClick={() => setNewClient({
+                        ...newClient,
+                        visit_date: todayStr,
+                        visit_time: newClient.visit_time || '11:00 AM'
+                      })}
+                    >
+                      📅 Today
+                    </button>
+                    <button
+                      type="button"
+                      className={`chip ${newClient.visit_date === tomorrowStr ? 'active' : ''}`}
+                      onClick={() => setNewClient({
+                        ...newClient,
+                        visit_date: tomorrowStr,
+                        visit_time: newClient.visit_time || '11:00 AM'
+                      })}
+                    >
+                      ⚡ Tomorrow
+                    </button>
+                    <button
+                      type="button"
+                      className={`chip ${newClient.visit_date === dayAfterStr ? 'active' : ''}`}
+                      onClick={() => setNewClient({
+                        ...newClient,
+                        visit_date: dayAfterStr,
+                        visit_time: newClient.visit_time || '11:00 AM'
+                      })}
+                    >
+                      🗓️ In 2 Days
+                    </button>
                     {newClient.visit_date && (
-                      <div className={`visit-scheduled-live-hint ${newClient.visit_date === tomorrowStr ? 'tomorrow' : ''}`}>
-                        {newClient.visit_date === tomorrowStr ? (
-                          <span>
-                            📢 <strong>Tomorrow Radar Alert:</strong> This client will automatically appear on <strong>Tomorrow's Upcoming Visits</strong> radar with complete dossier and alert Admin in real time!
-                          </span>
-                        ) : newClient.visit_date === todayStr ? (
-                          <span>
-                            🟢 <strong>Today's Live Radar:</strong> This visit will immediately appear under <strong>Today's Scheduled Visits</strong> with 1-click completion.
-                          </span>
-                        ) : (
-                          <span>
-                            🗓️ <strong>Scheduled Visit:</strong> Appointment recorded for <strong>{newClient.visit_date}</strong> {newClient.visit_time ? `at ${newClient.visit_time}` : ''}.
-                          </span>
-                        )}
-                      </div>
+                      <button
+                        type="button"
+                        className="chip clear-chip"
+                        onClick={() => setNewClient({
+                          ...newClient,
+                          visit_date: '',
+                          visit_time: '',
+                          visit_notes: ''
+                        })}
+                      >
+                        ✕ Clear Visit
+                      </button>
                     )}
+                  </div>
 
+                  <div className="form-row-2">
                     <div className="form-field">
-                      <label style={{ fontSize: '11px', fontWeight: '600', color: '#166534' }}>Visit Notes / Remarks</label>
+                      <label style={{ fontSize: '11px', fontWeight: '600', color: '#166534' }}>Visit Date</label>
                       <input
-                        value={newClient.visit_notes}
-                        onChange={(e) => setNewClient({ ...newClient, visit_notes: e.target.value })}
-                        placeholder="e.g. Interested in 3 BHK Sample Flat tour"
+                        type="date"
+                        min={todayStr}
+                        value={newClient.visit_date}
+                        onChange={(e) => setNewClient({
+                          ...newClient,
+                          visit_date: e.target.value
+                        })}
+                      />
+                    </div>
+                    <div className="form-field">
+                      <label style={{ fontSize: '11px', fontWeight: '600', color: '#166534' }}>Visit Time</label>
+                      <input
+                        type="time"
+                        value={newClient.visit_time}
+                        onChange={(e) => setNewClient({
+                          ...newClient,
+                          visit_time: e.target.value
+                        })}
                       />
                     </div>
                   </div>
-                )}
+
+                  <div className="time-presets-row">
+                    <span className="time-preset-label">Quick Times:</span>
+                    {['10:30', '11:30', '14:00', '16:00', '17:30'].map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        className={`time-preset-btn ${newClient.visit_time === t ? 'active' : ''}`}
+                        onClick={() => setNewClient({ ...newClient, visit_time: t })}
+                      >
+                        {t === '10:30' ? '10:30 AM' : t === '11:30' ? '11:30 AM' : t === '14:00' ? '02:00 PM' : t === '16:00' ? '04:00 PM' : '05:30 PM'}
+                      </button>
+                    ))}
+                  </div>
+
+                  {newClient.visit_date && (
+                    <div className={`visit-scheduled-live-hint ${newClient.visit_date === tomorrowStr ? 'tomorrow' : ''}`}>
+                      {newClient.visit_date === tomorrowStr ? (
+                        <span>
+                          📢 <strong>Tomorrow Radar Alert:</strong> This client will automatically appear on <strong>Tomorrow's Upcoming Visits</strong> radar with complete dossier and alert Admin in real time!
+                        </span>
+                      ) : newClient.visit_date === todayStr ? (
+                        <span>
+                          🟢 <strong>Today's Live Radar:</strong> This visit will immediately appear under <strong>Today's Scheduled Visits</strong> for Admin and C.P.
+                        </span>
+                      ) : (
+                        <span>
+                          🗓️ <strong>Scheduled Visit:</strong> Appointment recorded for <strong>{newClient.visit_date}</strong> {newClient.visit_time ? `at ${newClient.visit_time}` : ''}.
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="form-field" style={{ marginTop: '8px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: '600', color: '#166534' }}>Visit Notes / Remarks</label>
+                    <input
+                      value={newClient.visit_notes}
+                      onChange={(e) => setNewClient({ ...newClient, visit_notes: e.target.value })}
+                      placeholder="e.g. Interested in 2/3 BHK sample flat tour"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Fixed Footer with Actions */}
@@ -2511,22 +2590,9 @@ function ClientVisitJourneyChart({
                         </small>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <small style={{ fontSize: '10px', color: '#6b7c77', fontWeight: '600' }}>STATUS:</small>
-                          {isAdmin ? (
-                            <select
-                              className="status-dropdown"
-                              value={v.status || 'Upcoming'}
-                              onChange={(e) => onUpdateStatus && onUpdateStatus(v.id, e.target.value)}
-                              title="Update visit status in MySQL"
-                            >
-                              {STAGES.map((s) => (
-                                <option key={s.key} value={s.key}>{s.key}</option>
-                              ))}
-                            </select>
-                          ) : (
-                            <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
-                              {v.status || 'Upcoming'}
-                            </span>
-                          )}
+                          <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
+                            {v.status || 'Upcoming'}
+                          </span>
                         </div>
                       </div>
 
@@ -2563,16 +2629,6 @@ function Details() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editData, setEditData] = useState({});
 
-  // Schedule Visit Modal inside details
-  const [showScheduleVisitModal, setShowScheduleVisitModal] = useState(false);
-  const [scheduleSubmitting, setScheduleSubmitting] = useState(false);
-  const [newVisitData, setNewVisitData] = useState({
-    visit_date: '',
-    visit_time: '11:00 AM',
-    notes: '',
-    status: 'Upcoming'
-  });
-
   // Reply Modal for complaints inside details
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [replyText, setReplyText] = useState('');
@@ -2590,44 +2646,6 @@ function Details() {
   const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
   const tomorrowObj = new Date(now.getTime() + 24 * 60 * 60 * 1000);
   const tomorrowStr = `${tomorrowObj.getFullYear()}-${pad(tomorrowObj.getMonth() + 1)}-${pad(tomorrowObj.getDate())}`;
-
-  const handleOpenScheduleVisit = () => {
-    setNewVisitData({
-      visit_date: todayStr,
-      visit_time: '11:00 AM',
-      notes: `Site tour of ${client?.unit_type || '2 BHK'} show flat and amenities inspection`,
-      status: 'Upcoming'
-    });
-    setShowScheduleVisitModal(true);
-  };
-
-  const handleCreateVisitForClient = async (e) => {
-    e.preventDefault();
-    if (!newVisitData.visit_date) {
-      alert('Please select a visit date.');
-      return;
-    }
-    setScheduleSubmitting(true);
-    try {
-      await api.createVisit({
-        client_id: client.id,
-        visit_date: newVisitData.visit_date,
-        visit_time: newVisitData.visit_time || '11:00 AM',
-        notes: newVisitData.notes || '',
-        status: newVisitData.status || 'Upcoming'
-      });
-      setShowScheduleVisitModal(false);
-      setToast('Visit successfully scheduled & saved to MySQL!');
-      setTimeout(() => setToast(''), 4000);
-      setTab('visits');
-      loadClient();
-      window.dispatchEvent(new CustomEvent('portal-refresh'));
-    } catch (err) {
-      alert(err.message || 'Failed to schedule visit');
-    } finally {
-      setScheduleSubmitting(false);
-    }
-  };
 
   const handleVisitStatusChange = async (visitId, newStatus) => {
     try {
@@ -2759,21 +2777,6 @@ function Details() {
             <span className="view-details-hint">View Details →</span>
           </button>
         )}
-        {isAdmin && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
-            <small style={{ fontSize: '11px', color: '#6b7280', fontWeight: '600' }}>Status in MySQL:</small>
-            <select
-              className="status-dropdown"
-              style={{ width: 'auto', padding: '4px 10px', fontSize: '12px' }}
-              value={client.status || 'Upcoming Visit'}
-              onChange={(e) => handleStatusChange(e.target.value)}
-              title="Change client status in MySQL"
-            >
-              <option value="Upcoming Visit">Upcoming Visit</option>
-              <option value="Closed">Closed</option>
-            </select>
-          </div>
-        )}
       </div>
 
       <div className="subtabs">
@@ -2782,9 +2785,6 @@ function Details() {
         </button>
         <button type="button" className={tab === 'visits' ? 'on' : ''} onClick={() => setTab('visits')}>
           Visits ({client.visits?.length || 0})
-        </button>
-        <button type="button" className={tab === 'payments' ? 'on' : ''} onClick={() => setTab('payments')}>
-          Payments ({client.payments?.length || 0})
         </button>
         <button type="button" className={tab === 'complaints' ? 'on' : ''} onClick={() => setTab('complaints')}>
           Complaints ({client.complaints?.length || 0})
@@ -2823,16 +2823,6 @@ function Details() {
               <h4 style={{ margin: 0, fontSize: '15px', color: '#163a33' }}>Site Visits History &amp; Milestone Journey ({client.visits?.length || 0})</h4>
               <small style={{ color: '#6b7c77' }}>Customer property visit pipeline &amp; inspection history</small>
             </div>
-            {isAdmin && (
-              <button
-                type="button"
-                className="btn-sm btn-primary"
-                onClick={handleOpenScheduleVisit}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '6px 14px', fontSize: '12.5px' }}
-              >
-                <Plus size={14} /> + Schedule Visit
-              </button>
-            )}
           </div>
 
           {/* Visual Visit Journey Flowchart */}
@@ -2846,17 +2836,7 @@ function Details() {
 
           {(!client.visits || client.visits.length === 0) ? (
             <div className="empty-msg" style={{ textAlign: 'center', padding: '24px 16px' }}>
-              <div style={{ marginBottom: '8px' }}>No site visits recorded for this client yet.</div>
-              {isAdmin && (
-                <button
-                  type="button"
-                  className="btn-sm btn-primary"
-                  onClick={handleOpenScheduleVisit}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', margin: '0 auto' }}
-                >
-                  <Plus size={14} /> Schedule First Visit
-                </button>
-              )}
+              <div>No site visits recorded for this client yet.</div>
             </div>
           ) : (
             <div className="timeline">
@@ -2870,47 +2850,14 @@ function Details() {
                       </small>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <small style={{ fontSize: '10px', color: '#6b7c77', fontWeight: '600' }}>STATUS:</small>
-                        {isAdmin ? (
-                          <select
-                            className="status-dropdown"
-                            value={v.status || 'Upcoming'}
-                            onChange={(e) => handleVisitStatusChange(v.id, e.target.value)}
-                            title="Update visit status in MySQL"
-                          >
-                            {['Upcoming', 'Visited', 'FollowUp', 'Revisited', 'Booked', 'Closed'].map((s) => (
-                              <option key={s} value={s}>{s}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
-                            {v.status || 'Upcoming'}
-                          </span>
-                        )}
+                        <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
+                          {v.status || 'Upcoming'}
+                        </span>
                       </div>
                     </div>
                     <b style={{ fontSize: '14px', marginTop: '4px', display: 'inline-block' }}>Site Visit — {v.status || 'Upcoming'}</b>
                     <p style={{ marginTop: '4px' }}>{v.notes || 'No remarks provided.'}</p>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {tab === 'payments' && (
-        <div className="subtab-content">
-          {(!client.payments || client.payments.length === 0) ? (
-            <div className="empty-msg">No payments recorded for this client.</div>
-          ) : (
-            <div className="list">
-              {client.payments.map((p) => (
-                <div className="payment" key={p.id}>
-                  <div>
-                    <b>₹ {Number(p.amount).toLocaleString('en-IN')}</b>
-                    <small>Due: {p.due_date ? new Date(p.due_date).toLocaleDateString() : 'N/A'} • Paid: {p.paid_date ? new Date(p.paid_date).toLocaleDateString() : 'Not paid'}</small>
-                  </div>
-                  <span className={`status ${(p.status || 'pending').toLowerCase()}`}>{p.status}</span>
                 </div>
               ))}
             </div>
@@ -2973,11 +2920,9 @@ function Details() {
       {/* Bottom Action Buttons (Admin Only) */}
       {isAdmin && (
         <div className="details-bottom-bar-figma">
-          <button type="button" className="btn-outline-figma" onClick={() => setShowEditModal(true)}>
-            Edit Client
-          </button>
-          <button type="button" className="btn-primary-figma" onClick={handleOpenScheduleVisit}>
-            + Schedule Visit
+          <button type="button" className="btn-primary-figma" onClick={() => setShowEditModal(true)}>
+            <Edit size={15} style={{ marginRight: '6px', verticalAlign: '-2px' }} />
+            Edit Client Details
           </button>
         </div>
       )}
@@ -3121,116 +3066,17 @@ function Details() {
         </div>
       )}
 
-      {/* Schedule Client Visit Modal */}
-      {isAdmin && showScheduleVisitModal && (
-        <div className="modal-overlay" onClick={() => setShowScheduleVisitModal(false)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <CalendarDays size={18} style={{ color: '#075c4d' }} />
-                <h3 style={{ margin: 0 }}>Schedule Visit for {client.name}</h3>
-              </div>
-              <button type="button" className="close-btn" onClick={() => setShowScheduleVisitModal(false)}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateVisitForClient}>
-              <div className="modal-scroll-body">
-                <div style={{ padding: '12px 14px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '10px', marginBottom: '14px' }}>
-                  <div style={{ fontSize: '14px', fontWeight: '700', color: '#166534' }}>{client.name}</div>
-                  <div style={{ fontSize: '12px', color: '#15803d', marginTop: '3px' }}>
-                    {client.phone || 'No phone'} • {client.unit_type || '2 BHK'} {client.budget ? `• ${client.budget}` : ''}
-                  </div>
-                </div>
-
-                {/* Quick Date Chips */}
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-                  <button
-                    type="button"
-                    className={`time-preset-btn ${newVisitData.visit_date === todayStr ? 'active' : ''}`}
-                    onClick={() => setNewVisitData({ ...newVisitData, visit_date: todayStr })}
-                  >
-                    📅 Today
-                  </button>
-                  <button
-                    type="button"
-                    className={`time-preset-btn ${newVisitData.visit_date === tomorrowStr ? 'active' : ''}`}
-                    onClick={() => setNewVisitData({ ...newVisitData, visit_date: tomorrowStr })}
-                  >
-                    ⚡ Tomorrow
-                  </button>
-                </div>
-
-                <div className="form-grid-2" style={{ marginBottom: '12px' }}>
-                  <div className="form-field">
-                    <label>Visit Date *</label>
-                    <input
-                      type="date"
-                      required
-                      value={newVisitData.visit_date}
-                      onChange={(e) => setNewVisitData({ ...newVisitData, visit_date: e.target.value })}
-                    />
-                  </div>
-                  <div className="form-field">
-                    <label>Visit Time</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 11:30 AM"
-                      value={newVisitData.visit_time}
-                      onChange={(e) => setNewVisitData({ ...newVisitData, visit_time: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-field" style={{ marginBottom: '12px' }}>
-                  <label>Visit Status</label>
-                  <select
-                    value={newVisitData.status}
-                    onChange={(e) => setNewVisitData({ ...newVisitData, status: e.target.value })}
-                  >
-                    <option value="Upcoming">Upcoming</option>
-                    <option value="Visited">Visited</option>
-                    <option value="FollowUp">FollowUp</option>
-                    <option value="Revisited">Revisited</option>
-                    <option value="Booked">Booked</option>
-                    <option value="Closed">Closed</option>
-                  </select>
-                </div>
-
-                <div className="form-field">
-                  <label>Remarks / Visit Agenda</label>
-                  <textarea
-                    rows={3}
-                    value={newVisitData.notes}
-                    onChange={(e) => setNewVisitData({ ...newVisitData, notes: e.target.value })}
-                    placeholder="e.g. Site tour of 2 BHK show flat and review payment schedule"
-                  />
-                </div>
-              </div>
-
-              <div className="modal-footer-actions">
-                <button type="button" className="btn-cancel" onClick={() => setShowScheduleVisitModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn-save" disabled={scheduleSubmitting}>
-                  <Check size={16} /> {scheduleSubmitting ? 'Scheduling...' : 'Save Visit to MySQL'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </Shell>
   );
 }
 
 function Visits() {
   const { openUserDetails } = useUserModal();
+  const location = useLocation();
   const userStr = localStorage.getItem('user');
   let user = { role: 'admin' };
   try { if (userStr) user = JSON.parse(userStr); } catch {}
-  const isAdmin = user.role === 'admin';
+  const isAdmin = location.pathname.startsWith('/admin') || user.role === 'admin';
   const prefix = isAdmin ? '/admin' : '/partner';
 
   const [selectedClientId, setSelectedClientId] = useState(null);
@@ -3278,7 +3124,11 @@ function Visits() {
     loadData(true);
     const handleRefresh = () => loadData(false);
     window.addEventListener('portal-refresh', handleRefresh);
-    return () => window.removeEventListener('portal-refresh', handleRefresh);
+    window.addEventListener('storage', handleRefresh);
+    return () => {
+      window.removeEventListener('portal-refresh', handleRefresh);
+      window.removeEventListener('storage', handleRefresh);
+    };
   }, []);
 
   const handleCreate = async (e) => {
@@ -3330,6 +3180,17 @@ function Visits() {
     return (v.status || 'Upcoming').toLowerCase() === statusFilter.toLowerCase();
   });
 
+  // Deduplicate by client_id so that a single client is never displayed multiple times
+  const displayedVisits = [];
+  const seenClientIds = new Set();
+  filteredVisits.forEach((v) => {
+    const key = v.client_id ? Number(v.client_id) : `v-${v.id}`;
+    if (!seenClientIds.has(key)) {
+      seenClientIds.add(key);
+      displayedVisits.push(v);
+    }
+  });
+
   return (
     <Shell>
       {toast && (
@@ -3342,42 +3203,11 @@ function Visits() {
       <div className="heading">
         <div>
           <small>{isAdmin ? 'Admin Master View' : 'Channel Partner Dashboard'}</small>
-          <h2>Site Visit Records ({visits.length})</h2>
+          <h2>Site Visit Records ({displayedVisits.length})</h2>
         </div>
         {isAdmin && (
           <button type="button" className="icon" onClick={openNewVisitModal} title="Schedule Visit">
             <Plus size={18} />
-          </button>
-        )}
-      </div>
-
-      {/* Quick Jump / Selector for Client Visit Journey Chart */}
-      <div className="visit-client-chart-selector-bar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <BarChart2 size={18} style={{ color: '#075c4d' }} />
-          <span style={{ fontSize: '13px', fontWeight: '700', color: '#163a33' }}>
-            Client Visit Chart:
-          </span>
-        </div>
-        <select
-          value={selectedClientId ? String(selectedClientId) : ''}
-          onChange={(e) => setSelectedClientId(e.target.value ? Number(e.target.value) : null)}
-          className="client-chart-select"
-        >
-          <option value="">-- All Clients (Site Visits Timeline List) --</option>
-          {clients.map((c) => (
-            <option key={c.id} value={String(c.id)}>
-              {c.name} ({c.unit_type || '2 BHK'} • {c.phone || 'No phone'})
-            </option>
-          ))}
-        </select>
-        {selectedClientId && (
-          <button
-            type="button"
-            className="btn-clear-chart-view"
-            onClick={() => setSelectedClientId(null)}
-          >
-            ✕ Back to All Visits
           </button>
         )}
       </div>
@@ -3425,7 +3255,7 @@ function Visits() {
 
           {loading ? (
             <div className="empty-msg">Loading visits...</div>
-          ) : filteredVisits.length === 0 ? (
+          ) : displayedVisits.length === 0 ? (
             <div className="empty-msg">
               {searchQuery || statusFilter !== 'All'
                 ? 'No visit updates match your filter.'
@@ -3433,7 +3263,7 @@ function Visits() {
             </div>
           ) : (
         <div className="timeline">
-          {filteredVisits.map((v) => {
+          {displayedVisits.map((v) => {
             const dayClass = getVisitDayClassification(v.visit_date);
             const dateDisplay = dayClass.formattedDate || new Date(v.visit_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -3448,22 +3278,9 @@ function Visits() {
                     </small>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <small style={{ fontSize: '10px', color: '#6b7c77', fontWeight: '600' }}>STATUS:</small>
-                      {isAdmin ? (
-                        <select
-                          className="status-dropdown"
-                          value={v.status || 'Upcoming'}
-                          onChange={(e) => handleStatusChange(v.id, e.target.value)}
-                          title="Update visit status in MySQL"
-                        >
-                          {['Upcoming', 'Visited', 'FollowUp', 'Revisited', 'Booked', 'Closed'].map((s) => (
-                            <option key={s} value={s}>{s}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
-                          {v.status || 'Upcoming'}
-                        </span>
-                      )}
+                      <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
+                        {v.status || 'Upcoming'}
+                      </span>
                     </div>
                   </div>
 
@@ -4119,29 +3936,18 @@ function Payments() {
   try { if (userStr) currentUser = JSON.parse(userStr); } catch {}
   const isAdmin = currentUser.role === 'admin';
 
-  const [payments, setPayments] = useState([]);
   const [bills, setBills] = useState([]);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('bills'); // 'bills' or 'payments'
   const [filter, setFilter] = useState('all');
   const [toast, setToast] = useState('');
 
   // Modals state
   const [showRaiseBillModal, setShowRaiseBillModal] = useState(false);
-  const [showRecordPaymentModal, setShowRecordPaymentModal] = useState(false);
   const [showPayoutModal, setShowPayoutModal] = useState(false);
   const [selectedBillForPayment, setSelectedBillForPayment] = useState(null);
   const [payoutDate, setPayoutDate] = useState('');
   const [payoutRef, setPayoutRef] = useState('');
-
-  // New Client Payment form state (Admin only)
-  const [newPayment, setNewPayment] = useState({
-    client_id: '',
-    amount: '',
-    due_date: '',
-    status: 'pending'
-  });
 
   // Raise a Bill form state (Channel Partner)
   const initialBillForm = {
@@ -4161,18 +3967,15 @@ function Payments() {
   const loadData = (showSpinner = true) => {
     if (showSpinner) setLoading(true);
     Promise.all([
-      api.getPayments().catch(() => []),
       api.getBills().catch(() => []),
       api.getClients().catch(() => [])
     ])
-      .then(([p, b, c]) => {
-        setPayments(Array.isArray(p) ? p : []);
+      .then(([b, c]) => {
         setBills(Array.isArray(b) ? b : []);
         const clientList = Array.isArray(c) ? c : [];
         setClients(clientList);
 
         if (clientList.length > 0) {
-          setNewPayment((prev) => ({ ...prev, client_id: prev.client_id || clientList[0].id }));
           setBillForm((prev) => ({
             ...prev,
             client_id: prev.client_id || clientList[0].id,
@@ -4272,47 +4075,10 @@ function Payments() {
     }
   };
 
-  // Admin Create Client Payment
-  const handleCreatePayment = async (e) => {
-    e.preventDefault();
-    if (!newPayment.client_id || !newPayment.amount) return;
-    try {
-      await api.createPayment(newPayment);
-      setShowRecordPaymentModal(false);
-      setNewPayment({ client_id: clients[0]?.id || '', amount: '', due_date: '', status: 'pending' });
-      setToast('Payment record saved to MySQL!');
-      setTimeout(() => setToast(''), 4000);
-      loadData();
-      window.dispatchEvent(new CustomEvent('portal-refresh'));
-    } catch (err) {
-      alert(err.message || 'Failed to record payment');
-    }
-  };
-
-  // Admin Update Client Payment Status
-  const handlePaymentStatusChange = async (paymentId, newStatus) => {
-    try {
-      const paidDate = newStatus === 'paid' ? new Date().toISOString().slice(0, 10) : null;
-      await api.updatePayment(paymentId, { status: newStatus, paid_date: paidDate });
-      setToast(`Payment marked as "${newStatus}" in MySQL!`);
-      setTimeout(() => setToast(''), 4000);
-      loadData();
-      window.dispatchEvent(new CustomEvent('portal-refresh'));
-    } catch (err) {
-      alert(err.message || 'Failed to update payment status');
-    }
-  };
-
   // Filter bills
   const filteredBills = bills.filter((b) => {
     if (filter === 'all') return true;
     return (b.status || '').toLowerCase() === filter.toLowerCase();
-  });
-
-  // Filter payments
-  const filteredPayments = payments.filter((p) => {
-    if (filter === 'all') return true;
-    return (p.status || '').toLowerCase() === filter.toLowerCase();
   });
 
   return (
@@ -4329,7 +4095,7 @@ function Payments() {
           <small>{isAdmin ? 'Finance & Brokerage Admin' : 'Brokerage Commission & Billing'}</small>
           <h2>{isAdmin ? 'CP Bills & Payment Approvals' : 'My Brokerage Bills & Payments'}</h2>
         </div>
-        {!isAdmin ? (
+        {!isAdmin && (
           <button
             type="button"
             className="btn-primary"
@@ -4339,38 +4105,10 @@ function Payments() {
           >
             <Plus size={16} /> Raise a Bill
           </button>
-        ) : (
-          <button
-            type="button"
-            className="btn-sm"
-            onClick={() => setShowRecordPaymentModal(true)}
-            title="Record Client Payment"
-          >
-            <Plus size={16} /> Record Client Payment
-          </button>
         )}
       </div>
 
-      <div className="subtabs" style={{ marginBottom: '14px' }}>
-        <button
-          type="button"
-          className={activeTab === 'bills' ? 'on' : ''}
-          onClick={() => setActiveTab('bills')}
-        >
-          <Landmark size={15} style={{ marginRight: '6px', verticalAlign: '-2px' }} />
-          {isAdmin ? 'CP Brokerage Bills' : 'My Raised Bills'} ({bills.length})
-        </button>
-        <button
-          type="button"
-          className={activeTab === 'payments' ? 'on' : ''}
-          onClick={() => setActiveTab('payments')}
-        >
-          <CircleDollarSign size={15} style={{ marginRight: '6px', verticalAlign: '-2px' }} />
-          Client Payment Records ({payments.length})
-        </button>
-      </div>
-
-      <div className="filter-pills-row">
+      <div className="filter-pills-row" style={{ marginTop: '4px', marginBottom: '16px' }}>
         {['All', 'Pending', 'Paid'].map((st) => (
           <button
             key={st}
@@ -4384,25 +4122,23 @@ function Payments() {
       </div>
 
       {loading ? (
-        <div className="empty-msg">Loading financial records from MySQL...</div>
-      ) : activeTab === 'bills' ? (
-        /* TAB 1: CP BROKERAGE BILLS */
-        filteredBills.length === 0 ? (
-          <div className="empty-msg">
-            No bills found matching this filter.
-            {!isAdmin && (
-              <div style={{ marginTop: '10px' }}>
-                <button
-                  type="button"
-                  className="btn-sm btn-primary"
-                  onClick={() => setShowRaiseBillModal(true)}
-                >
-                  <Plus size={14} /> Raise a Bill Now
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
+        <div className="empty-msg">Loading brokerage bills from MySQL...</div>
+      ) : filteredBills.length === 0 ? (
+        <div className="empty-msg">
+          No bills found matching this filter.
+          {!isAdmin && (
+            <div style={{ marginTop: '10px' }}>
+              <button
+                type="button"
+                className="btn-sm btn-primary"
+                onClick={() => setShowRaiseBillModal(true)}
+              >
+                <Plus size={14} /> Raise a Bill Now
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
           <div className="list">
             {filteredBills.map((b) => (
               <div
@@ -4523,77 +4259,7 @@ function Payments() {
             ))}
           </div>
         )
-      ) : (
-        /* TAB 2: CLIENT PAYMENT RECORDS */
-        filteredPayments.length === 0 ? (
-          <div className="empty-msg">No client payment records found matching this filter.</div>
-        ) : (
-          <div className="list">
-            {filteredPayments.map((p) => (
-              <div className="payment payment-row" key={p.id}>
-                <div className="payment-info">
-                  <span className="person">
-                    {(p.client_name || 'P').charAt(0).toUpperCase()}
-                  </span>
-                  <div className="payment-details">
-                    <b>
-                      {p.client_name || 'Client'}
-                      {p.partner_name && (
-                        <button
-                          type="button"
-                          className="badge badge-partner badge-clickable"
-                          onClick={() => openUserDetails({
-                            id: p.partner_id,
-                            name: p.partner_name,
-                            firm_name: p.partner_firm_name,
-                            email: p.partner_email,
-                            phone: p.partner_phone,
-                            phone2: p.partner_phone2,
-                            role: 'partner'
-                          })}
-                          title="Click to view Channel Partner details (Mail, Mobile, Firm)"
-                        >
-                          👤 CP: {p.partner_name}
-                        </button>
-                      )}
-                    </b>
-                    <small>
-                      {p.due_date && `Due: ${new Date(p.due_date).toLocaleDateString('en-GB')}`}
-                      {p.paid_date && `Paid: ${new Date(p.paid_date).toLocaleDateString('en-GB')}`}
-                      {!p.due_date && !p.paid_date && 'Transaction logged'}
-                    </small>
-                  </div>
-                </div>
-
-                <div className="payment-actions" style={{ alignItems: 'flex-end' }}>
-                  <strong style={{ fontSize: '15px', color: '#111827' }}>
-                    ₹ {Number(p.amount).toLocaleString('en-IN')}
-                  </strong>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span className={`status-pill-figma ${(p.status || 'pending').toLowerCase()}`}>
-                      {p.status}
-                    </span>
-                    {/* ONLY Admin has authority to change payment status */}
-                    {isAdmin && (
-                      <select
-                        className="status-dropdown"
-                        style={{ width: 'auto', padding: '3px 8px', fontSize: '11.5px' }}
-                        value={p.status || 'pending'}
-                        onChange={(e) => handlePaymentStatusChange(p.id, e.target.value)}
-                        title="Update payment status in MySQL"
-                      >
-                        <option value="pending">Pending</option>
-                        <option value="paid">Mark Paid</option>
-                        <option value="overdue">Overdue</option>
-                      </select>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )
-      )}
+      }
 
       {/* Bottom Button for CP */}
       {!isAdmin && (
@@ -4923,77 +4589,6 @@ function Payments() {
         </div>
       )}
 
-      {/* MODAL 3: RECORD CLIENT PAYMENT (Admin Only) */}
-      {showRecordPaymentModal && (
-        <div className="modal-overlay" onClick={() => setShowRecordPaymentModal(false)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Record Client Payment</h3>
-              <button type="button" className="close-btn" onClick={() => setShowRecordPaymentModal(false)}>
-                <X size={18} />
-              </button>
-            </div>
-            <form onSubmit={handleCreatePayment}>
-              <div className="modal-scroll-body">
-                <div className="form-field" style={{ marginBottom: '12px' }}>
-                  <label>Select Client *</label>
-                  <select
-                    value={newPayment.client_id}
-                    onChange={(e) => setNewPayment({ ...newPayment, client_id: e.target.value })}
-                  >
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name} ({c.phone || 'No phone'})</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="form-field" style={{ marginBottom: '12px' }}>
-                  <label>Amount (₹) *</label>
-                  <input
-                    type="number"
-                    required
-                    value={newPayment.amount}
-                    onChange={(e) => setNewPayment({ ...newPayment, amount: e.target.value })}
-                    placeholder="50000"
-                  />
-                </div>
-
-                <div className="form-grid-2" style={{ marginBottom: '12px' }}>
-                  <div className="form-field">
-                    <label>Due Date</label>
-                    <input
-                      type="date"
-                      value={newPayment.due_date}
-                      onChange={(e) => setNewPayment({ ...newPayment, due_date: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="form-field">
-                    <label>Status</label>
-                    <select
-                      value={newPayment.status}
-                      onChange={(e) => setNewPayment({ ...newPayment, status: e.target.value })}
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="paid">Paid</option>
-                      <option value="overdue">Overdue</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              <div className="modal-footer-actions">
-                <button type="button" className="btn-cancel" onClick={() => setShowRecordPaymentModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn-save">
-                  <Check size={16} /> Save Payment
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </Shell>
   );
 }
@@ -5102,6 +4697,14 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
+        {/* Direct Shortcuts / Aliases */}
+        <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+        <Route path="/partner" element={<Navigate to="/partner/dashboard" replace />} />
+        <Route path="/dashboard" element={<Navigate to="/login" replace />} />
+        <Route path="/visits" element={<Navigate to="/login" replace />} />
+        <Route path="/clients" element={<Navigate to="/login" replace />} />
+        <Route path="/payments" element={<Navigate to="/login" replace />} />
+
         {/* Partner routes */}
         <Route path="/partner/dashboard" element={<Dashboard />} />
         <Route path="/partner/clients" element={<Clients />} />
@@ -5118,6 +4721,9 @@ function App() {
         <Route path="/admin/complaints" element={<Complaints />} />
         <Route path="/admin/payments" element={<Payments />} />
         <Route path="/admin/partners" element={<Partners />} />
+
+        {/* Catch-all route to prevent blank screens on invalid URLs */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
       {modalUser && (

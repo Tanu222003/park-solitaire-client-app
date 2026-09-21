@@ -1,6 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import { initDatabase } from './src/config/db.js';
 import { ensureMySQL } from './src/config/ensure-mysql.js';
@@ -16,6 +19,7 @@ import { errorHandler, notFound } from './src/middleware/errorHandler.js';
 
 dotenv.config();
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
 app.use(cors({ origin: true, credentials: true }));
@@ -55,13 +59,19 @@ app.get('/api/events', (req, res) => {
 });
 
 app.get('/download-apk', (_req, res) => {
-  res.download('/Users/tanishasureshparmar/Downloads/ps/release-bundle/park-solitaire-debug.apk', 'park-solitaire-debug.apk');
+  const p = path.resolve(__dirname, '../release-bundle/park-solitaire-debug.apk');
+  if (fs.existsSync(p)) return res.download(p, 'park-solitaire-debug.apk');
+  res.status(404).json({ message: 'File not available on this server' });
 });
 app.get('/download-aab', (_req, res) => {
-  res.download('/Users/tanishasureshparmar/Downloads/ps/release-bundle/park-solitaire-v1.0.0.aab', 'park-solitaire-v1.0.0.aab');
+  const p = path.resolve(__dirname, '../release-bundle/park-solitaire-v1.0.0.aab');
+  if (fs.existsSync(p)) return res.download(p, 'park-solitaire-v1.0.0.aab');
+  res.status(404).json({ message: 'File not available on this server' });
 });
 app.get('/download-zip', (_req, res) => {
-  res.download('/Users/tanishasureshparmar/Downloads/ps/park-solitaire-android-studio.zip', 'park-solitaire-android-studio.zip');
+  const p = path.resolve(__dirname, '../park-solitaire-android-studio.zip');
+  if (fs.existsSync(p)) return res.download(p, 'park-solitaire-android-studio.zip');
+  res.status(404).json({ message: 'File not available on this server' });
 });
 
 app.use('/api/auth', authRoutes);

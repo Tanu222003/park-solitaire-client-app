@@ -73,10 +73,24 @@ export async function createVisit(req, res, next) {
 
     const partnerId = req.user.role === 'admin' ? clients[0].partner_id : req.user.id;
 
-    const [result] = await pool.query(
-      'INSERT INTO visits (client_id, partner_id, visit_date, visit_time, notes, status) VALUES (?, ?, ?, ?, ?, ?)',
-      [client_id, partnerId, visit_date, visit_time || null, notes || null, status || 'Upcoming']
-    );
+    // If visit already exists for this client, update it instead of adding multiple times
+    const [existingVisits] = await pool.query('SELECT id, notes FROM visits WHERE client_id = ? ORDER BY id DESC LIMIT 1', [client_id]);
+    let visitId;
+    if (existingVisits.length > 0) {
+      visitId = existingVisits[0].id;
+      const combinedNotes = notes ? (existingVisits[0].notes ? `${existingVisits[0].notes} | ${notes}` : notes) : existingVisits[0].notes;
+      await pool.query(
+        'UPDATE visits SET visit_date = ?, visit_time = ?, notes = ?, status = ? WHERE id = ?',
+        [visit_date, visit_time || '11:00 AM', combinedNotes || null, status || 'Upcoming', visitId]
+      );
+    } else {
+      const [result] = await pool.query(
+        'INSERT INTO visits (client_id, partner_id, visit_date, visit_time, notes, status) VALUES (?, ?, ?, ?, ?, ?)',
+        [client_id, partnerId, visit_date, visit_time || null, notes || null, status || 'Upcoming']
+      );
+      visitId = result.insertId;
+    }
+
     const [rows] = await pool.query(`
       SELECT v.*,
              c.name AS client_name,
@@ -98,7 +112,7 @@ export async function createVisit(req, res, next) {
       LEFT JOIN clients c ON c.id = v.client_id
       LEFT JOIN users u ON u.id = v.partner_id
       WHERE v.id = ?
-    `, [result.insertId]);
+    `, [visitId]);
 
     broadcastEvent('VISIT_CREATED', {
       visit: rows[0],

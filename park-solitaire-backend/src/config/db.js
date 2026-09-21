@@ -8,18 +8,31 @@ dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const DB_HOST = process.env.DB_HOST || process.env.MYSQLHOST || 'localhost';
-const DB_PORT = Number(process.env.DB_PORT || process.env.MYSQLPORT) || 3306;
-const DB_USER = process.env.DB_USER || process.env.MYSQLUSER || 'root';
-const DB_PASSWORD = process.env.DB_PASSWORD || process.env.MYSQLPASSWORD || '';
-const DB_NAME = process.env.DB_NAME || process.env.MYSQLDATABASE || 'park_solitaire';
+const dbConfig = {
+  host: process.env.DB_HOST || process.env.MYSQLHOST || 'localhost',
+  port: Number(process.env.DB_PORT || process.env.MYSQLPORT) || 3306,
+  user: process.env.DB_USER || process.env.MYSQLUSER || 'root',
+  password: process.env.DB_PASSWORD || process.env.MYSQLPASSWORD || '',
+  database: process.env.DB_NAME || process.env.MYSQLDATABASE || 'park_solitaire'
+};
+
+const connUrl = process.env.MYSQL_URL || process.env.DATABASE_URL;
+if (connUrl && !process.env.DB_HOST && !process.env.MYSQLHOST) {
+  try {
+    const parsed = new URL(connUrl);
+    dbConfig.host = parsed.hostname;
+    dbConfig.port = Number(parsed.port) || 3306;
+    dbConfig.user = decodeURIComponent(parsed.username || 'root');
+    dbConfig.password = decodeURIComponent(parsed.password || '');
+    const cleanDb = (parsed.pathname || '').replace(/^\//, '');
+    if (cleanDb) dbConfig.database = cleanDb;
+  } catch (e) {
+    console.error('Could not parse database connection URL:', e.message);
+  }
+}
 
 const pool = mysql.createPool({
-  host: DB_HOST,
-  port: DB_PORT,
-  user: DB_USER,
-  password: DB_PASSWORD,
-  database: DB_NAME,
+  ...dbConfig,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
@@ -28,10 +41,7 @@ const pool = mysql.createPool({
 
 export async function initDatabase() {
   const connection = await mysql.createConnection({
-    host: DB_HOST,
-    port: DB_PORT,
-    user: DB_USER,
-    password: DB_PASSWORD,
+    ...dbConfig,
     multipleStatements: true
   });
 

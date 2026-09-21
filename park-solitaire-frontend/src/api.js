@@ -1,20 +1,18 @@
 // Park Solitaire CRM - Resilient API Client with Live Backend & Smart Demo Engine
 
 export function getBaseUrl() {
-  const saved = localStorage.getItem("server_api_url");
-  if (saved && saved.trim()) return saved.replace(/\/$/, "");
-
   if (typeof window !== "undefined" && window.location) {
     const isHttps = window.location.protocol === "https:";
     const host = window.location.hostname;
-    const env = import.meta.env.VITE_API_URL;
+    const saved = localStorage.getItem("server_api_url");
 
-    if (env && env.trim()) {
+    if (saved && saved.trim()) {
       // Mixed Content prevention: cannot query insecure HTTP backend from HTTPS Vercel domain
-      if (isHttps && env.startsWith("http://")) {
-        return "";
+      if (isHttps && saved.trim().startsWith("http://")) {
+        console.warn("Ignoring saved HTTP backend on HTTPS domain to avoid Mixed Content blocking");
+      } else {
+        return saved.trim().replace(/\/$/, "");
       }
-      return env.replace(/\/$/, "");
     }
 
     // If hosted on Vercel, GitHub Pages, or any HTTPS cloud domain without an explicit API URL
@@ -334,16 +332,13 @@ function loadDemoStore() {
     const raw = localStorage.getItem("ps_demo_store");
     if (raw) {
       const parsed = JSON.parse(raw);
-      // Ensure today/tomorrow dates are current
-      const { todayStr, tomorrowStr } = getTodayAndTomorrowStr();
-      if (parsed.visits && parsed.visits.length > 0) {
-        parsed.visits[0].visit_date = todayStr;
-        if (parsed.visits[1]) parsed.visits[1].visit_date = todayStr;
-        if (parsed.visits[2]) parsed.visits[2].visit_date = tomorrowStr;
-      }
-      if (!parsed.bills || !Array.isArray(parsed.bills) || parsed.bills.length === 0) {
-        parsed.bills = getInitialDemoStore().bills;
-      }
+      const init = getInitialDemoStore();
+      if (!Array.isArray(parsed.users) || parsed.users.length === 0) parsed.users = init.users;
+      if (!Array.isArray(parsed.clients) || parsed.clients.length === 0) parsed.clients = init.clients;
+      if (!Array.isArray(parsed.visits) || parsed.visits.length === 0) parsed.visits = init.visits;
+      if (!Array.isArray(parsed.complaints)) parsed.complaints = init.complaints;
+      if (!Array.isArray(parsed.payments)) parsed.payments = init.payments;
+      if (!Array.isArray(parsed.bills) || parsed.bills.length === 0) parsed.bills = init.bills;
       return parsed;
     }
   } catch (e) {
@@ -430,7 +425,8 @@ function handleMockRequest(endpoint, options = {}) {
 
   // GET /clients
   if (endpoint === "/clients" && method === "GET") {
-    if (currentUser.role === 'partner') {
+    const isExplicitAdmin = currentUser.role === 'admin' || (typeof window !== "undefined" && window.location && window.location.pathname.startsWith("/admin"));
+    if (!isExplicitAdmin && currentUser.role === 'partner') {
       return store.clients.filter(c => Number(c.partner_id) === Number(currentUser.id) || !c.partner_id);
     }
     return store.clients;
@@ -456,32 +452,33 @@ function handleMockRequest(endpoint, options = {}) {
     };
     store.clients.unshift(newClient);
 
-    // Only Admin can automatically schedule a visit during client creation
-    let scheduledVisit = null;
-    if (body.visit_date && currentUser.role === 'admin') {
-      scheduledVisit = {
-        id: Date.now() + 1,
-        client_id: newClient.id,
-        client_name: newClient.name,
-        client_phone: newClient.phone,
-        client_email: newClient.email,
-        client_address: newClient.address,
-        unit_type: newClient.unit_type,
-        budget: newClient.budget,
-        partner_id: partnerId,
-        partner_name: partnerUser.name || 'Channel Partner',
-        partner_firm_name: partnerUser.firm_name || '',
-        partner_phone: partnerUser.phone || '',
-        partner_phone2: partnerUser.phone2 || '',
-        partner_email: partnerUser.email || '',
-        visit_date: body.visit_date,
-        visit_time: body.visit_time || '11:00 AM',
-        notes: body.visit_notes || 'Site visit scheduled during client onboarding',
-        status: 'scheduled',
-        created_at: new Date().toISOString()
-      };
-      store.visits.unshift(scheduledVisit);
-    }
+    // Automatically register an initial Upcoming visit for Today so it reflects in Admin Today's Visits and visits menu
+    const { todayStr } = getTodayAndTomorrowStr();
+    const targetVisitDate = body.visit_date || todayStr;
+    const defaultNotes = body.visit_notes || `New client registered by ${partnerUser.name || 'Channel Partner'} (${newClient.unit_type || 'Unit'})`;
+
+    const scheduledVisit = {
+      id: Date.now() + 1,
+      client_id: newClient.id,
+      client_name: newClient.name,
+      client_phone: newClient.phone,
+      client_email: newClient.email,
+      client_address: newClient.address,
+      unit_type: newClient.unit_type,
+      budget: newClient.budget,
+      partner_id: partnerId,
+      partner_name: partnerUser.name || 'Channel Partner',
+      partner_firm_name: partnerUser.firm_name || '',
+      partner_phone: partnerUser.phone || '',
+      partner_phone2: partnerUser.phone2 || '',
+      partner_email: partnerUser.email || '',
+      visit_date: targetVisitDate,
+      visit_time: body.visit_time || '11:00 AM',
+      notes: defaultNotes,
+      status: 'Upcoming',
+      created_at: new Date().toISOString()
+    };
+    store.visits.unshift(scheduledVisit);
 
     saveDemoStore(store);
     return { ...newClient, scheduled_visit: scheduledVisit };
@@ -517,7 +514,8 @@ function handleMockRequest(endpoint, options = {}) {
 
   // GET /visits
   if (endpoint === "/visits" && method === "GET") {
-    if (currentUser.role === 'partner') {
+    const isExplicitAdmin = currentUser.role === 'admin' || (typeof window !== "undefined" && window.location && window.location.pathname.startsWith("/admin"));
+    if (!isExplicitAdmin && currentUser.role === 'partner') {
       return store.visits.filter(v => Number(v.partner_id) === Number(currentUser.id) || !v.partner_id);
     }
     return store.visits;
@@ -532,6 +530,25 @@ function handleMockRequest(endpoint, options = {}) {
     const client = store.clients.find(c => Number(c.id) === clientId);
     const partnerId = client?.partner_id || (currentUser.role === 'partner' ? currentUser.id : 2);
     const partnerUser = store.users.find(u => Number(u.id) === Number(partnerId)) || currentUser;
+
+    // If a visit already exists for this client, update it instead of adding multiple times
+    const existingIdx = store.visits.findIndex(v => Number(v.client_id) === clientId);
+    if (existingIdx !== -1) {
+      const existing = store.visits[existingIdx];
+      const combinedNotes = body.notes ? (existing.notes ? `${existing.notes} | ${body.notes}` : body.notes) : existing.notes;
+      store.visits[existingIdx] = {
+        ...existing,
+        visit_date: body.visit_date,
+        visit_time: body.visit_time || existing.visit_time || '11:00 AM',
+        notes: combinedNotes,
+        status: body.status || existing.status || 'Upcoming'
+      };
+      if (client && (client.status === 'Pending' || !client.status)) {
+        client.status = 'Site Visit Planned';
+      }
+      saveDemoStore(store);
+      return store.visits[existingIdx];
+    }
 
     const newVisit = {
       id: Date.now(),

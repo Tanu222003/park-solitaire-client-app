@@ -86,48 +86,49 @@ export async function createClient(req, res, next) {
 
     const createdClient = rows[0];
 
-    // Only Admin can automatically schedule a visit during client creation
-    let scheduledVisit = null;
-    if (visit_date && req.user.role === 'admin') {
-      const [vResult] = await pool.query(
-        'INSERT INTO visits (client_id, partner_id, visit_date, visit_time, notes, status) VALUES (?, ?, ?, ?, ?, ?)',
-        [clientId, req.user.id, visit_date, visit_time || null, visit_notes || null, 'Upcoming']
-      );
+    // Automatically register an initial Upcoming visit for Today so it reflects in Admin dashboard and visit records
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const targetVisitDate = visit_date || todayStr;
+    const defaultNotes = visit_notes || `New client registered by ${createdClient.partner_name || 'Channel Partner'} (${createdClient.unit_type || 'Unit'})`;
 
-      const [vRows] = await pool.query(`
-        SELECT v.*,
-               c.name AS client_name,
-               c.phone AS client_phone,
-               c.email AS client_email,
-               c.address AS client_address,
-               c.unit_type AS unit_type,
-               c.unit_type AS client_unit_type,
-               c.budget AS budget,
-               c.budget AS client_budget,
-               c.source AS client_source,
-               c.status AS client_status,
-               u.name AS partner_name,
-               u.firm_name AS partner_firm_name,
-               u.phone AS partner_phone,
-               u.phone2 AS partner_phone2,
-               u.email AS partner_email
-        FROM visits v
-        LEFT JOIN clients c ON c.id = v.client_id
-        LEFT JOIN users u ON u.id = v.partner_id
-        WHERE v.id = ?
-      `, [vResult.insertId]);
+    const [vResult] = await pool.query(
+      'INSERT INTO visits (client_id, partner_id, visit_date, visit_time, notes, status) VALUES (?, ?, ?, ?, ?, ?)',
+      [clientId, req.user.id, targetVisitDate, visit_time || '11:00 AM', defaultNotes, 'Upcoming']
+    );
 
-      scheduledVisit = vRows[0];
+    const [vRows] = await pool.query(`
+      SELECT v.*,
+             c.name AS client_name,
+             c.phone AS client_phone,
+             c.email AS client_email,
+             c.address AS client_address,
+             c.unit_type AS unit_type,
+             c.unit_type AS client_unit_type,
+             c.budget AS budget,
+             c.budget AS client_budget,
+             c.source AS client_source,
+             c.status AS client_status,
+             u.name AS partner_name,
+             u.firm_name AS partner_firm_name,
+             u.phone AS partner_phone,
+             u.phone2 AS partner_phone2,
+             u.email AS partner_email
+      FROM visits v
+      LEFT JOIN clients c ON c.id = v.client_id
+      LEFT JOIN users u ON u.id = v.partner_id
+      WHERE v.id = ?
+    `, [vResult.insertId]);
 
-      // Broadcast VISIT_CREATED so Visit Radar updates immediately in real-time on all screens
-      const visitAlert = getVisitAlertMessage(scheduledVisit, req.user.name, 'scheduled');
-      broadcastEvent('VISIT_CREATED', {
-        visit: scheduledVisit,
-        author: req.user.name,
-        role: req.user.role,
-        message: visitAlert
-      });
-    }
+    const scheduledVisit = vRows[0];
+
+    // Broadcast VISIT_CREATED so Visit Radar & Admin Dashboard update immediately in real-time
+    const visitAlert = getVisitAlertMessage(scheduledVisit, req.user.name, 'scheduled');
+    broadcastEvent('VISIT_CREATED', {
+      visit: scheduledVisit,
+      author: req.user.name,
+      role: req.user.role,
+      message: visitAlert
+    });
 
     broadcastEvent('CLIENT_CREATED', {
       client: createdClient,
