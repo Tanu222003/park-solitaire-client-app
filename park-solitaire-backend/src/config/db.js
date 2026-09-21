@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import mysql from 'mysql2/promise';
+import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -48,6 +49,43 @@ export async function initDatabase() {
   const schemaPath = path.join(__dirname, '..', '..', 'database', 'schema.sql');
   const schema = fs.readFileSync(schemaPath, 'utf8');
   await connection.query(schema);
+
+  // Seed initial users and clients if database is newly initialized
+  try {
+    const [userRows] = await connection.query('SELECT COUNT(*) as count FROM users');
+    if (userRows[0].count === 0) {
+      console.log('  Seeding initial admin and partner accounts...');
+      const adminHash = await bcrypt.hash('admin123', 10);
+      const partnerHash = await bcrypt.hash('partner123', 10);
+
+      await connection.query(
+        "INSERT INTO users (name, firm_name, email, password, role, phone, status) VALUES (?, ?, ?, ?, ?, ?, 'active')",
+        ['Admin', 'Park Solitaire Management', 'admin@parksolitaire.com', adminHash, 'admin', '+91 98200 12345']
+      );
+
+      const [partnerRes] = await connection.query(
+        "INSERT INTO users (name, firm_name, email, password, role, phone, phone2, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'active')",
+        ['Rahul Sharma', 'Solitaire Realty Group', 'partner@parksolitaire.com', partnerHash, 'partner', '+91 90000 00001', '+91 98200 54321']
+      );
+
+      const partnerId = partnerRes.insertId;
+      const initialClients = [
+        ['Priya Sharma', '+91 98765 43210', 'priya@example.com', 'Sector 21, Noida', '2 BHK', '₹ 50L - 70L', 'Upcoming Visit'],
+        ['Rohit Verma', '+91 87654 32109', 'rohit@example.com', 'Andheri West, Mumbai', '3 BHK', '₹ 70L - 90L', 'Upcoming Visit'],
+        ['Anjali Singh', '+91 99887 66554', 'anjali@example.com', 'Baner, Pune', '2 BHK', '₹ 50L - 70L', 'Upcoming Visit'],
+        ['Sneha Patil', '+91 90909 12121', 'sneha@example.com', 'Viman Nagar, Pune', '2 BHK', '₹ 55L - 75L', 'Closed']
+      ];
+
+      for (const [cName, cPhone, cEmail, cAddr, cUnit, cBudget, cStatus] of initialClients) {
+        await connection.query(
+          'INSERT INTO clients (partner_id, name, phone, email, address, unit_type, budget, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [partnerId, cName, cPhone, cEmail, cAddr, cUnit, cBudget, cStatus]
+        );
+      }
+    }
+  } catch (seedErr) {
+    console.warn('  Initial seed notice:', seedErr.message);
+  }
 
   // Ensure firm_name and contact_name columns exist in users table
   try {

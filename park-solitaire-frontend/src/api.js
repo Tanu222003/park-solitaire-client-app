@@ -15,29 +15,18 @@ export function getBaseUrl() {
       }
     }
 
-    // If hosted on Vercel, GitHub Pages, or any HTTPS cloud domain without an explicit API URL
-    if (
-      isHttps ||
-      host.includes("vercel.app") ||
-      host.includes("github.io") ||
-      host.includes("netlify.app")
-    ) {
-      return ""; // Enables instant demo engine without Mixed Content errors
-    }
-
     if (host === "localhost" || host === "127.0.0.1") {
       return "http://localhost:5001/api";
     }
 
-    if (host) {
-      return `http://${host}:5001/api`;
-    }
+    // Default to live Railway cloud backend (HTTPS)
+    return "https://park-solitaire-backend-production.up.railway.app/api";
   }
 
   const env = import.meta.env.VITE_API_URL;
   if (env && env.trim()) return env.replace(/\/$/, "");
 
-  return "http://localhost:5001/api";
+  return "https://park-solitaire-backend-production.up.railway.app/api";
 }
 
 export function getServerUrl() {
