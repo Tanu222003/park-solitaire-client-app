@@ -84,11 +84,11 @@
               "raw": "{\n  \"email\": \"admin@parksolitaire.com\",\n  \"password\": \"admin123\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/auth/login",
+              "raw": "{{baseUrl}}/api/auth/admin/login",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "login"]
+              "path": ["api", "auth", "admin", "login"]
             },
-            "description": "Logs in as System Admin and automatically saves the JWT token for subsequent requests."
+            "description": "Logs in as System Admin. Strictly rejects Channel Partner credentials."
           },
           "response": []
         },
@@ -122,11 +122,11 @@
               "raw": "{\n  \"email\": \"partner@parksolitaire.com\",\n  \"password\": \"partner123\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/auth/login",
+              "raw": "{{baseUrl}}/api/auth/partner/login",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "auth", "login"]
+              "path": ["api", "auth", "partner", "login"]
             },
-            "description": "Logs in as Channel Partner."
+            "description": "Logs in as Channel Partner. Strictly rejects Admin credentials."
           },
           "response": []
         },

@@ -46,10 +46,10 @@ export async function register(req, res, next) {
 
 export async function login(req, res, next) {
   try {
-    const { email, password } = req.body || {};
+    const { email, password, role: requestedRole } = req.body || {};
 
     if (!email || !password) {
-      return res.status(400).json({ message: 'email and password are required' });
+      return res.status(400).json({ message: 'Email and password are required' });
     }
 
     const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
@@ -61,6 +61,20 @@ export async function login(req, res, next) {
 
     if (user.status === 'inactive') {
       return res.status(403).json({ message: 'This account has been deactivated' });
+    }
+
+    // Strict portal role enforcement
+    if (requestedRole) {
+      if (requestedRole === 'admin' && user.role !== 'admin') {
+        return res.status(403).json({
+          message: 'Access denied: Channel Partner credentials cannot be used for Admin login. Please use the Channel Partner login portal.'
+        });
+      }
+      if (requestedRole === 'partner' && user.role !== 'partner') {
+        return res.status(403).json({
+          message: 'Access denied: Admin accounts must log in through the Admin Portal (/admin/login).'
+        });
+      }
     }
 
     res.json({

@@ -372,9 +372,8 @@ function Auth({ children }) {
   );
 }
 
-function Login() {
+function PartnerLogin() {
   const navigate = useNavigate();
-  const [role, setRole] = useState('partner');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -385,23 +384,24 @@ function Login() {
     setError('');
 
     if (!email.trim() || !password) {
-      setError('Please enter both email/ID and password.');
+      setError('Please enter your registered mobile number or email, and password.');
       return;
     }
 
     setLoading(true);
     try {
-      const res = await api.login({ email: email.trim(), password });
+      const res = await api.login({ email: email.trim(), password, role: 'partner' });
+
+      if (res.user.role !== 'partner') {
+        setError('Access denied: Admin accounts must log in via the Admin Portal (/admin/login).');
+        return;
+      }
+
       localStorage.setItem('token', res.token);
       localStorage.setItem('user', JSON.stringify(res.user));
-
-      if (res.user.role === 'admin') {
-        navigate('/admin/dashboard');
-      } else {
-        navigate('/partner/dashboard');
-      }
+      navigate('/partner/dashboard');
     } catch (err) {
-      setError(err.message || 'Invalid email or password');
+      setError(err.message || 'Invalid email/mobile or password');
     } finally {
       setLoading(false);
     }
@@ -409,49 +409,35 @@ function Login() {
 
   return (
     <Auth>
-      <div className="tabs" style={{ marginBottom: '20px' }}>
-        <button
-          type="button"
-          className={role === 'partner' ? 'on' : ''}
-          onClick={() => { setRole('partner'); setError(''); }}
-        >
-          Channel Partner
-        </button>
-        <button
-          type="button"
-          className={role === 'admin' ? 'on' : ''}
-          onClick={() => { setRole('admin'); setError(''); }}
-        >
-          Admin
-        </button>
+      <div style={{
+        width: '56px',
+        height: '56px',
+        borderRadius: '50%',
+        background: '#e7f3ef',
+        color: '#075c4d',
+        display: 'grid',
+        placeItems: 'center',
+        margin: '0 auto 14px'
+      }}>
+        <Users size={26} />
       </div>
-
-      {role === 'admin' ? (
-        <>
-          <div className="admin-login-badge">
-            <ShieldAlert size={28} />
-          </div>
-          <h1 style={{ textAlign: 'center', marginTop: '0', color: '#075c4d' }}>Admin Login</h1>
-          <p style={{ textAlign: 'center', marginBottom: '20px' }}>
-            Restricted portal for system administrators only
-          </p>
-        </>
-      ) : (
-        <>
-          <h1 style={{ color: '#075c4d', marginTop: 0 }}>Welcome Back!</h1>
-          <p style={{ marginBottom: '20px' }}>Log in to access your portal</p>
-        </>
-      )}
+      <h1 style={{ color: '#075c4d', marginTop: 0, textAlign: 'center', fontSize: '22px' }}>
+        Channel Partner Login
+      </h1>
+      <p style={{ textAlign: 'center', marginBottom: '22px', color: '#6b7c77', fontSize: '13px' }}>
+        Log in to access your partner dashboard, add clients & track visits
+      </p>
 
       {error && <div className="err-msg">{error}</div>}
 
       <form onSubmit={handleLogin}>
-        <label>{role === 'admin' ? 'Admin ID' : 'Mobile No / C.P Firm Email'}</label>
+        <label>Mobile No / C.P Firm Email</label>
         <input
           type="text"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder={role === 'admin' ? 'admin@parksolitaire.com' : 'e.g. Enter your mobile number or email'}
+          placeholder="e.g. 9820012345 or partner@domain.com"
+          autoComplete="username"
         />
 
         <label>Password</label>
@@ -460,30 +446,120 @@ function Login() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder={role === 'admin' ? 'Enter admin password' : 'Enter your password'}
+            placeholder="Enter your password"
+            autoComplete="current-password"
           />
           <Lock size={15} />
         </div>
 
-        {role === 'partner' && <div className="forgot">Forgot Password?</div>}
+        <div className="forgot">Forgot Password?</div>
 
-        <button type="submit" className="primary" disabled={loading} style={{ marginTop: role === 'admin' ? '20px' : '0' }}>
+        <button type="submit" className="primary" disabled={loading} style={{ marginTop: '10px' }}>
           <LogIn size={16} />
-          {loading ? 'Verifying...' : role === 'admin' ? 'Verify & Continue' : 'Login'}
+          {loading ? 'Verifying...' : 'Login as Channel Partner'}
         </button>
       </form>
 
-      {role === 'partner' ? (
-        <div className="foot">
-          Don't have an account? <Link to="/register">Register</Link>
+      <div className="foot" style={{ marginTop: '20px', textAlign: 'center' }}>
+        <div>
+          Don't have an account? <Link to="/register" style={{ fontWeight: '600', color: '#075c4d' }}>Register Channel Partner</Link>
         </div>
-      ) : (
-        <div className="foot">
-          <button type="button" className="linkbtn" onClick={() => setRole('partner')}>
-            Switch to Channel Partner Login
-          </button>
+        <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid #e2e8f0', fontSize: '12px' }}>
+          <span style={{ color: '#64748b' }}>Authorized Administrator? </span>
+          <Link to="/admin/login" style={{ color: '#075c4d', fontWeight: '600' }}>
+            Go to Admin Login →
+          </Link>
         </div>
-      )}
+      </div>
+    </Auth>
+  );
+}
+
+function AdminLogin() {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async (e) => {
+    e?.preventDefault();
+    setError('');
+
+    if (!email.trim() || !password) {
+      setError('Please enter Admin ID and password.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.login({ email: email.trim(), password, role: 'admin' });
+
+      if (res.user.role !== 'admin') {
+        setError('Access denied: Channel Partner credentials cannot be used to log in as Admin.');
+        return;
+      }
+
+      localStorage.setItem('token', res.token);
+      localStorage.setItem('user', JSON.stringify(res.user));
+      navigate('/admin/dashboard');
+    } catch (err) {
+      setError(err.message || 'Invalid admin credentials');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Auth>
+      <div className="admin-login-badge">
+        <ShieldAlert size={28} />
+      </div>
+      <h1 style={{ textAlign: 'center', marginTop: '0', color: '#075c4d', fontSize: '22px' }}>
+        Admin Secure Login
+      </h1>
+      <p style={{ textAlign: 'center', marginBottom: '22px', color: '#6b7c77', fontSize: '13px' }}>
+        Restricted portal for system administrators only
+      </p>
+
+      {error && <div className="err-msg">{error}</div>}
+
+      <form onSubmit={handleLogin}>
+        <label>Admin ID / Email</label>
+        <input
+          type="text"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="admin@parksolitaire.com"
+          autoComplete="username"
+        />
+
+        <label>Password</label>
+        <div className="pw">
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter admin password"
+            autoComplete="current-password"
+          />
+          <Lock size={15} />
+        </div>
+
+        <button type="submit" className="primary" disabled={loading} style={{ marginTop: '20px' }}>
+          <LogIn size={16} />
+          {loading ? 'Verifying Admin Access...' : 'Verify & Enter Admin Console'}
+        </button>
+      </form>
+
+      <div className="foot" style={{ marginTop: '24px', textAlign: 'center' }}>
+        <div style={{ paddingTop: '14px', borderTop: '1px solid #e2e8f0', fontSize: '12px' }}>
+          <span style={{ color: '#64748b' }}>Channel Partner? </span>
+          <Link to="/login" style={{ color: '#075c4d', fontWeight: '600' }}>
+            Go to Channel Partner Login →
+          </Link>
+        </div>
+      </div>
     </Auth>
   );
 }
@@ -806,10 +882,23 @@ function Shell({ children }) {
   } catch {}
 
   const handleLogout = () => {
+    const wasAdmin = user?.role === 'admin';
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    navigate('/login');
+    navigate(wasAdmin ? '/admin/login' : '/login');
   };
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const isAdminPath = location.pathname.startsWith('/admin');
+    if (!token) {
+      navigate(isAdminPath ? '/admin/login' : '/login', { replace: true });
+      return;
+    }
+    if (isAdminPath && user.role !== 'admin') {
+      navigate('/admin/login', { replace: true });
+    }
+  }, [location.pathname, user.role, navigate]);
 
   useEffect(() => {
     setDrawerOpen(false);
@@ -4508,12 +4597,15 @@ function App() {
     <UserModalContext.Provider value={{ openUserDetails }}>
       <Routes>
         <Route path="/" element={<Splash />} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<PartnerLogin />} />
+        <Route path="/partner/login" element={<PartnerLogin />} />
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin-login" element={<AdminLogin />} />
         <Route path="/register" element={<Register />} />
 
         {/* Direct Shortcuts / Aliases */}
-        <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-        <Route path="/partner" element={<Navigate to="/partner/dashboard" replace />} />
+        <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
+        <Route path="/partner" element={<Navigate to="/login" replace />} />
         <Route path="/dashboard" element={<Navigate to="/login" replace />} />
         <Route path="/visits" element={<Navigate to="/login" replace />} />
         <Route path="/clients" element={<Navigate to="/login" replace />} />

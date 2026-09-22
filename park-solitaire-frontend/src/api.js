@@ -354,15 +354,28 @@ function handleMockRequest(endpoint, options = {}) {
   const method = (options.method || "GET").toUpperCase();
   const body = options.body ? JSON.parse(options.body) : {};
 
-  // POST /auth/login
-  if (endpoint === "/auth/login") {
+  // POST /auth/login, /auth/admin/login, /auth/partner/login
+  if (endpoint === "/auth/login" || endpoint === "/auth/admin/login" || endpoint === "/auth/partner/login") {
     const email = (body.email || "").trim().toLowerCase();
     const pw = (body.password || "").trim();
+    const requestedRole = endpoint === "/auth/admin/login" ? "admin" : endpoint === "/auth/partner/login" ? "partner" : body.role;
 
-    // Check admin
+    // Check admin credentials
     if (email === "admin@parksolitaire.com" || email === "admin") {
+      if (requestedRole === "partner") {
+        const error = new Error("Access denied: Admin accounts must log in through the Admin Portal (/admin/login).");
+        error.status = 403;
+        throw error;
+      }
       const user = store.users.find((u) => u.role === "admin");
       return { token: "demo-jwt-token-admin", user };
+    }
+
+    // If requested role is admin, but user is not admin, reject
+    if (requestedRole === "admin") {
+      const error = new Error("Access denied: Channel Partner credentials cannot be used for Admin login.");
+      error.status = 403;
+      throw error;
     }
 
     // Check partners
@@ -374,7 +387,6 @@ function handleMockRequest(endpoint, options = {}) {
     );
 
     if (!user) {
-      // Default to Rahul Sharma demo partner if user types anything
       user = store.users.find((u) => u.role === "partner");
     }
 
