@@ -2425,49 +2425,6 @@ function ClientVisitJourneyChart({
         </div>
       </div>
 
-      {/* Admin Quick Action Controls or CP Read-Only Notice */}
-      <div className="journey-admin-controls-card">
-        {isAdmin ? (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
-              <span style={{ fontSize: '12px', fontWeight: '700', color: '#163a33' }}>
-                ⚡ Admin: Click Stage in Round Flowchart or Select Below:
-              </span>
-              <small style={{ color: '#6b7c77', fontSize: '11px' }}>
-                Updates client visit status in MySQL
-              </small>
-            </div>
-            <div className="admin-stage-btn-row">
-              {STAGES.map((st) => (
-                <button
-                  key={st.key}
-                  type="button"
-                  className={`btn-stage-quick ${currentStageObj.key === st.key ? 'active' : ''}`}
-                  onClick={() => {
-                    if (visits.length > 0 && onUpdateStatus) {
-                      onUpdateStatus(visits[0].id, st.key);
-                    }
-                  }}
-                  disabled={visits.length === 0}
-                  title={`Set status to ${st.title}`}
-                >
-                  {st.title}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="cp-readonly-banner">
-            <span style={{ fontSize: '12.5px', fontWeight: '700', color: '#075c4d' }}>
-              👁️ Channel Partner Status:
-            </span>
-            <span style={{ fontSize: '12.5px', color: '#4b5563', marginLeft: '6px' }}>
-              Current stage is <b>{currentStageObj.title}</b> (Stage {currentStageIndex + 1} of 6, {progressPercent}% completed). Status is managed by Admin.
-            </span>
-          </div>
-        )}
-      </div>
-
       {/* Individual Site Visits History Timeline for this Client */}
       {!embedded && (
         <div className="journey-visits-history">
