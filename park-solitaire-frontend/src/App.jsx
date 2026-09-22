@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate, useParams, Navigate } from 'react-router-dom';
 import {
   ArrowLeft, Bell, CalendarDays, Check, CheckCircle2, ChevronRight,
-  ChevronUp, ChevronDown,
   CircleDollarSign, ClipboardList, Edit, FileWarning, Home, Lock,
   LogIn, LogOut, Menu, MessageSquare, MoreHorizontal, Plus, Search,
   Send, Settings, Users, X, Phone, Mail, MapPin, Building, Tag,
@@ -324,22 +323,48 @@ function UserDetailsModal({ user: initialUser, onClose }) {
   );
 }
 
-function Auth({ children, onBackToCover }) {
+function Splash() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const userStr = localStorage.getItem('user');
+    let target = '/login';
+    if (token && userStr) {
+      try {
+        const u = JSON.parse(userStr);
+        target = u.role === 'admin' ? '/admin/dashboard' : '/partner/dashboard';
+      } catch {}
+    }
+    const t = setTimeout(() => navigate(target), 1400);
+    return () => clearTimeout(t);
+  }, [navigate]);
+
+  return (
+    <div className="splash-container">
+      <div className="splash-building-art">
+        {Array.from({ length: 16 }).map((_, i) => (
+          <div className="splash-window" key={i} />
+        ))}
+      </div>
+
+      <div className="splash-content">
+        <div className="splash-logo-card">
+          <img
+            src="/logo.png"
+            alt="Park Solitaire Lifespaces LLP"
+            className="splash-logo-img"
+          />
+        </div>
+        <div className="splash-badge-sub">Channel Partner & Admin Portal</div>
+      </div>
+    </div>
+  );
+}
+
+function Auth({ children }) {
   return (
     <div className="auth">
       <div className="authbox">
-        {onBackToCover && (
-          <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-            <button
-              type="button"
-              className="frontpage-back-cover-pill"
-              onClick={onBackToCover}
-            >
-              <ChevronDown size={14} />
-              <span>Back to Cover</span>
-            </button>
-          </div>
-        )}
         <Logo full large />
         {children}
       </div>
@@ -347,7 +372,7 @@ function Auth({ children, onBackToCover }) {
   );
 }
 
-function Login({ onBackToCover }) {
+function Login() {
   const navigate = useNavigate();
   const [role, setRole] = useState('partner');
   const [email, setEmail] = useState('');
@@ -383,7 +408,7 @@ function Login({ onBackToCover }) {
   };
 
   return (
-    <Auth onBackToCover={onBackToCover}>
+    <Auth>
       <div className="tabs" style={{ marginBottom: '20px' }}>
         <button
           type="button"
@@ -460,89 +485,6 @@ function Login({ onBackToCover }) {
         </div>
       )}
     </Auth>
-  );
-}
-
-function Splash({ initialSection = 'cover' }) {
-  const containerRef = React.useRef(null);
-  const heroRef = React.useRef(null);
-  const loginRef = React.useRef(null);
-
-  const scrollToLogin = () => {
-    loginRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const scrollToCover = () => {
-    heroRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    if (initialSection === 'login' && loginRef.current) {
-      setTimeout(() => {
-        loginRef.current?.scrollIntoView({ behavior: 'auto' });
-      }, 60);
-    }
-  }, [initialSection]);
-
-  // Handle touch swipe-up on the hero section for mobile gesture support
-  const touchStartY = React.useRef(0);
-  const handleTouchStart = (e) => {
-    touchStartY.current = e.touches[0].clientY;
-  };
-  const handleTouchEnd = (e) => {
-    const deltaY = touchStartY.current - e.changedTouches[0].clientY;
-    if (deltaY > 35) {
-      scrollToLogin();
-    }
-  };
-
-  // Wheel gesture for desktop
-  const handleWheel = (e) => {
-    if (e.deltaY > 15) {
-      scrollToLogin();
-    }
-  };
-
-  return (
-    <div ref={containerRef} className="frontpage-scroll-container">
-      {/* Section 1: Frontpage Hero Cover */}
-      <section
-        ref={heroRef}
-        className="frontpage-hero-section"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        onWheel={handleWheel}
-      >
-        {/* Ambient background blur layer filling any aspect ratio or screen width */}
-        <div className="frontpage-ambient-blur" aria-hidden="true" />
-
-        {/* Foreground sharp artwork container */}
-        <div
-          className="frontpage-hero-wrapper"
-          onClick={scrollToLogin}
-          title="Click or scroll up to Login"
-        >
-          <img
-            src="/frontpage.jpg"
-            alt="Park Solitaire Lifespaces LLP - Channel Partner & Admin App"
-            className="frontpage-hero-img"
-          />
-        </div>
-
-        {/* Floating animated scroll pill */}
-        <div className="frontpage-scroll-indicator" onClick={scrollToLogin}>
-          <div className="frontpage-scroll-pill">
-            <ChevronUp size={16} className="frontpage-chevron-bounce" />
-            <span>Scroll up to Login</span>
-          </div>
-        </div>
-      </section>
-
-      {/* Section 2: Login Portal */}
-      <section ref={loginRef} className="frontpage-login-section">
-        <Login onBackToCover={scrollToCover} />
-      </section>
-    </div>
   );
 }
 
@@ -4565,8 +4507,8 @@ function App() {
   return (
     <UserModalContext.Provider value={{ openUserDetails }}>
       <Routes>
-        <Route path="/" element={<Splash initialSection="cover" />} />
-        <Route path="/login" element={<Splash initialSection="login" />} />
+        <Route path="/" element={<Splash />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
         {/* Direct Shortcuts / Aliases */}
