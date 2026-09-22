@@ -563,8 +563,8 @@ function Register() {
     e?.preventDefault();
     setError('');
 
-    if (!form.firm_name.trim() || !form.name.trim() || !form.phone.trim() || !form.email.trim() || !form.password) {
-      setError('Firm Name, Primary Contact Number, Email ID, and Password are required.');
+    if (!form.firm_name.trim() || !form.name.trim() || !form.email.trim() || !form.phone.trim() || !form.password) {
+      setError('Firm Name, C.P Name, Email, Contact no, and Password are required.');
       return;
     }
 
@@ -601,16 +601,16 @@ function Register() {
           placeholder="Enter agency / firm name"
         />
 
-        <label>Primary Contact Number *</label>
+        <label>C.P Name *</label>
         <input
-          type="tel"
+          type="text"
           required
-          value={form.phone}
-          onChange={(e) => setForm({ ...form, phone: e.target.value })}
-          placeholder="Enter phone number"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          placeholder="Enter channel partner name"
         />
 
-        <label>Email ID *</label>
+        <label>Email *</label>
         <input
           type="email"
           required
@@ -619,7 +619,16 @@ function Register() {
           placeholder="Enter email address"
         />
 
-        <label>Alternate Number <span style={{ fontWeight: 400, color: '#6b7280', fontSize: '11.5px' }}>(Optional)</span></label>
+        <label>Contact no *</label>
+        <input
+          type="tel"
+          required
+          value={form.phone}
+          onChange={(e) => setForm({ ...form, phone: e.target.value })}
+          placeholder="Enter contact number"
+        />
+
+        <label>Alternate number <span style={{ fontWeight: 400, color: '#6b7280', fontSize: '11.5px' }}>(Optional)</span></label>
         <input
           type="tel"
           value={form.phone2}
@@ -627,7 +636,7 @@ function Register() {
           placeholder="Enter alternate number"
         />
 
-        <label>Password *</label>
+        <label>Create Password *</label>
         <div className="pw">
           <input
             type="password"
@@ -640,7 +649,7 @@ function Register() {
         </div>
 
         <button type="submit" className="primary" style={{ marginTop: '16px' }} disabled={loading}>
-          {loading ? 'Registering...' : 'Register as Channel Partner'}
+          {loading ? 'Registering...' : 'Register Channel Partner'}
         </button>
       </form>
 
