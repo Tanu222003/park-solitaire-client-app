@@ -424,20 +424,26 @@ function Login({ defaultRole = 'partner' }) {
     }
   };
 
+  const handleSwitchTab = (newRole) => {
+    setRole(newRole);
+    setError('');
+    navigate(newRole === 'admin' ? '/admin/login' : '/login', { replace: true });
+  };
+
   return (
     <Auth>
       <div className="tabs" style={{ marginBottom: '20px' }}>
         <button
           type="button"
           className={role === 'partner' ? 'on' : ''}
-          onClick={() => { setRole('partner'); setError(''); }}
+          onClick={() => handleSwitchTab('partner')}
         >
           Channel Partner
         </button>
         <button
           type="button"
           className={role === 'admin' ? 'on' : ''}
-          onClick={() => { setRole('admin'); setError(''); }}
+          onClick={() => handleSwitchTab('admin')}
         >
           Admin
         </button>
@@ -496,7 +502,7 @@ function Login({ defaultRole = 'partner' }) {
         </div>
       ) : (
         <div className="foot">
-          <button type="button" className="linkbtn" onClick={() => { setRole('partner'); setError(''); }}>
+          <button type="button" className="linkbtn" onClick={() => handleSwitchTab('partner')}>
             Switch to Channel Partner Login
           </button>
         </div>
