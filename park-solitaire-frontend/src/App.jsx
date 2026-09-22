@@ -1689,11 +1689,11 @@ function Dashboard({ admin = false }) {
               <span className="admin-stat-growth">+12% this month</span>
             </Link>
             <Link to={`${prefix}/payments`} className="admin-stat-card-large">
-              <small>Total Revenue</small>
+              <small>Total Payment Approval</small>
               <div className="admin-stat-number">
                 ₹ {stats?.totalPaid ? Number(stats.totalPaid).toLocaleString('en-IN') : '42,80,000'}
               </div>
-              <span className="admin-stat-sub">Total Value</span>
+              <span className="admin-stat-sub">Total Approved</span>
             </Link>
           </div>
 
