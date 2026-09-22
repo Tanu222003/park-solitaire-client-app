@@ -372,36 +372,53 @@ function Auth({ children }) {
   );
 }
 
-function PartnerLogin() {
+function Login({ defaultRole = 'partner' }) {
   const navigate = useNavigate();
+  const [role, setRole] = useState(defaultRole);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (defaultRole) {
+      setRole(defaultRole);
+      setError('');
+    }
+  }, [defaultRole]);
 
   const handleLogin = async (e) => {
     e?.preventDefault();
     setError('');
 
     if (!email.trim() || !password) {
-      setError('Please enter your registered mobile number or email, and password.');
+      setError(role === 'admin' ? 'Please enter Admin ID and password.' : 'Please enter both email/ID and password.');
       return;
     }
 
     setLoading(true);
     try {
-      const res = await api.login({ email: email.trim(), password, role: 'partner' });
+      const res = await api.login({ email: email.trim(), password, role });
 
-      if (res.user.role !== 'partner') {
-        setError('Access denied: Admin accounts must log in via the Admin Portal (/admin/login).');
+      if (role === 'admin' && res.user.role !== 'admin') {
+        setError('Access denied: Channel Partner credentials cannot be used for Admin login.');
+        return;
+      }
+      if (role === 'partner' && res.user.role !== 'partner') {
+        setError('Access denied: Admin accounts must log in via the Admin tab.');
         return;
       }
 
       localStorage.setItem('token', res.token);
       localStorage.setItem('user', JSON.stringify(res.user));
-      navigate('/partner/dashboard');
+
+      if (res.user.role === 'admin') {
+        navigate('/admin/dashboard');
+      } else {
+        navigate('/partner/dashboard');
+      }
     } catch (err) {
-      setError(err.message || 'Invalid email/mobile or password');
+      setError(err.message || 'Invalid email or password');
     } finally {
       setLoading(false);
     }
@@ -409,35 +426,49 @@ function PartnerLogin() {
 
   return (
     <Auth>
-      <div style={{
-        width: '56px',
-        height: '56px',
-        borderRadius: '50%',
-        background: '#e7f3ef',
-        color: '#075c4d',
-        display: 'grid',
-        placeItems: 'center',
-        margin: '0 auto 14px'
-      }}>
-        <Users size={26} />
+      <div className="tabs" style={{ marginBottom: '20px' }}>
+        <button
+          type="button"
+          className={role === 'partner' ? 'on' : ''}
+          onClick={() => { setRole('partner'); setError(''); }}
+        >
+          Channel Partner
+        </button>
+        <button
+          type="button"
+          className={role === 'admin' ? 'on' : ''}
+          onClick={() => { setRole('admin'); setError(''); }}
+        >
+          Admin
+        </button>
       </div>
-      <h1 style={{ color: '#075c4d', marginTop: 0, textAlign: 'center', fontSize: '22px' }}>
-        Channel Partner Login
-      </h1>
-      <p style={{ textAlign: 'center', marginBottom: '22px', color: '#6b7c77', fontSize: '13px' }}>
-        Log in to access your partner dashboard, add clients & track visits
-      </p>
+
+      {role === 'admin' ? (
+        <>
+          <div className="admin-login-badge">
+            <ShieldAlert size={28} />
+          </div>
+          <h1 style={{ textAlign: 'center', marginTop: '0', color: '#075c4d' }}>Admin Login</h1>
+          <p style={{ textAlign: 'center', marginBottom: '20px' }}>
+            Restricted portal for system administrators only
+          </p>
+        </>
+      ) : (
+        <>
+          <h1 style={{ color: '#075c4d', marginTop: 0 }}>Welcome Back!</h1>
+          <p style={{ marginBottom: '20px' }}>Log in to access your portal</p>
+        </>
+      )}
 
       {error && <div className="err-msg">{error}</div>}
 
       <form onSubmit={handleLogin}>
-        <label>Mobile No / C.P Firm Email</label>
+        <label>{role === 'admin' ? 'Admin ID' : 'Mobile No / C.P Firm Email'}</label>
         <input
           type="text"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="e.g. 9820012345 or partner@domain.com"
-          autoComplete="username"
+          placeholder={role === 'admin' ? 'admin@parksolitaire.com' : 'e.g. Enter your mobile number or email'}
         />
 
         <label>Password</label>
@@ -446,120 +477,30 @@ function PartnerLogin() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter your password"
-            autoComplete="current-password"
+            placeholder={role === 'admin' ? 'Enter admin password' : 'Enter your password'}
           />
           <Lock size={15} />
         </div>
 
-        <div className="forgot">Forgot Password?</div>
+        {role === 'partner' && <div className="forgot">Forgot Password?</div>}
 
-        <button type="submit" className="primary" disabled={loading} style={{ marginTop: '10px' }}>
+        <button type="submit" className="primary" disabled={loading} style={{ marginTop: role === 'admin' ? '20px' : '0' }}>
           <LogIn size={16} />
-          {loading ? 'Verifying...' : 'Login as Channel Partner'}
+          {loading ? 'Verifying...' : role === 'admin' ? 'Verify & Continue' : 'Login'}
         </button>
       </form>
 
-      <div className="foot" style={{ marginTop: '20px', textAlign: 'center' }}>
-        <div>
-          Don't have an account? <Link to="/register" style={{ fontWeight: '600', color: '#075c4d' }}>Register Channel Partner</Link>
+      {role === 'partner' ? (
+        <div className="foot">
+          Don't have an account? <Link to="/register">Register</Link>
         </div>
-        <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid #e2e8f0', fontSize: '12px' }}>
-          <span style={{ color: '#64748b' }}>Authorized Administrator? </span>
-          <Link to="/admin/login" style={{ color: '#075c4d', fontWeight: '600' }}>
-            Go to Admin Login →
-          </Link>
+      ) : (
+        <div className="foot">
+          <button type="button" className="linkbtn" onClick={() => { setRole('partner'); setError(''); }}>
+            Switch to Channel Partner Login
+          </button>
         </div>
-      </div>
-    </Auth>
-  );
-}
-
-function AdminLogin() {
-  const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const handleLogin = async (e) => {
-    e?.preventDefault();
-    setError('');
-
-    if (!email.trim() || !password) {
-      setError('Please enter Admin ID and password.');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await api.login({ email: email.trim(), password, role: 'admin' });
-
-      if (res.user.role !== 'admin') {
-        setError('Access denied: Channel Partner credentials cannot be used to log in as Admin.');
-        return;
-      }
-
-      localStorage.setItem('token', res.token);
-      localStorage.setItem('user', JSON.stringify(res.user));
-      navigate('/admin/dashboard');
-    } catch (err) {
-      setError(err.message || 'Invalid admin credentials');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <Auth>
-      <div className="admin-login-badge">
-        <ShieldAlert size={28} />
-      </div>
-      <h1 style={{ textAlign: 'center', marginTop: '0', color: '#075c4d', fontSize: '22px' }}>
-        Admin Secure Login
-      </h1>
-      <p style={{ textAlign: 'center', marginBottom: '22px', color: '#6b7c77', fontSize: '13px' }}>
-        Restricted portal for system administrators only
-      </p>
-
-      {error && <div className="err-msg">{error}</div>}
-
-      <form onSubmit={handleLogin}>
-        <label>Admin ID / Email</label>
-        <input
-          type="text"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="admin@parksolitaire.com"
-          autoComplete="username"
-        />
-
-        <label>Password</label>
-        <div className="pw">
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter admin password"
-            autoComplete="current-password"
-          />
-          <Lock size={15} />
-        </div>
-
-        <button type="submit" className="primary" disabled={loading} style={{ marginTop: '20px' }}>
-          <LogIn size={16} />
-          {loading ? 'Verifying Admin Access...' : 'Verify & Enter Admin Console'}
-        </button>
-      </form>
-
-      <div className="foot" style={{ marginTop: '24px', textAlign: 'center' }}>
-        <div style={{ paddingTop: '14px', borderTop: '1px solid #e2e8f0', fontSize: '12px' }}>
-          <span style={{ color: '#64748b' }}>Channel Partner? </span>
-          <Link to="/login" style={{ color: '#075c4d', fontWeight: '600' }}>
-            Go to Channel Partner Login →
-          </Link>
-        </div>
-      </div>
+      )}
     </Auth>
   );
 }
@@ -4597,10 +4538,10 @@ function App() {
     <UserModalContext.Provider value={{ openUserDetails }}>
       <Routes>
         <Route path="/" element={<Splash />} />
-        <Route path="/login" element={<PartnerLogin />} />
-        <Route path="/partner/login" element={<PartnerLogin />} />
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin-login" element={<AdminLogin />} />
+        <Route path="/login" element={<Login defaultRole="partner" />} />
+        <Route path="/partner/login" element={<Login defaultRole="partner" />} />
+        <Route path="/admin/login" element={<Login defaultRole="admin" />} />
+        <Route path="/admin-login" element={<Login defaultRole="admin" />} />
         <Route path="/register" element={<Register />} />
 
         {/* Direct Shortcuts / Aliases */}
