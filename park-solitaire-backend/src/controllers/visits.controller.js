@@ -34,6 +34,42 @@ export async function getVisits(req, res, next) {
   }
 }
 
+export async function getVisitById(req, res, next) {
+  try {
+    const [rows] = await pool.query(`
+      SELECT v.*,
+             c.name AS client_name,
+             c.phone AS client_phone,
+             c.email AS client_email,
+             c.address AS client_address,
+             c.unit_type AS unit_type,
+             c.unit_type AS client_unit_type,
+             c.budget AS budget,
+             c.budget AS client_budget,
+             c.source AS client_source,
+             c.status AS client_status,
+             u.name AS partner_name,
+             u.firm_name AS partner_firm_name,
+             u.phone AS partner_phone,
+             u.phone2 AS partner_phone2,
+             u.email AS partner_email
+      FROM visits v
+      LEFT JOIN clients c ON c.id = v.client_id
+      LEFT JOIN users u ON u.id = v.partner_id
+      WHERE v.id = ?
+    `, [req.params.id]);
+
+    const visit = rows[0];
+    if (!visit) return res.status(404).json({ message: 'Visit not found' });
+    if (req.user.role !== 'admin' && Number(visit.partner_id) !== Number(req.user.id)) {
+      return res.status(403).json({ message: 'Not your visit' });
+    }
+    res.json(visit);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export function getVisitAlertMessage(visit, authorName, action = 'scheduled') {
   const visitDateStr = visit.visit_date ? String(visit.visit_date).slice(0, 10) : '';
   const now = new Date();
@@ -56,10 +92,6 @@ export function getVisitAlertMessage(visit, authorName, action = 'scheduled') {
 
 export async function createVisit(req, res, next) {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Channel Partners cannot schedule visits. Only Admin can schedule visits.' });
-    }
-
     const { client_id, visit_date, visit_time, notes, status } = req.body || {};
     if (!client_id || !visit_date) {
       return res.status(400).json({ message: 'client_id and visit_date are required' });
@@ -68,7 +100,7 @@ export async function createVisit(req, res, next) {
     const [clients] = await pool.query('SELECT name, partner_id FROM clients WHERE id = ?', [client_id]);
     if (clients.length === 0) return res.status(404).json({ message: 'Client not found' });
     if (req.user.role !== 'admin' && Number(clients[0].partner_id) !== Number(req.user.id)) {
-      return res.status(403).json({ message: 'Not your client' });
+      return res.status(403).json({ message: 'You can only schedule visits for your own clients.' });
     }
 
     const partnerId = req.user.role === 'admin' ? clients[0].partner_id : req.user.id;
