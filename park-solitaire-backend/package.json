@@ -10,6 +10,7 @@
     "db:init": "node database/init.js",
     "db:seed": "node database/seed.js",
     "db:test": "node database/test-connection.js",
+    "db:check-cloud": "node database/check-cloud-db.js",
     "db:reset-pw": "./reset-mysql-password.sh",
     "test": "node test-suite.js"
   },
