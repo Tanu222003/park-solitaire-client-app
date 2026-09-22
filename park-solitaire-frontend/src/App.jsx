@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Routes, Route, Link, useLocation, useNavigate, useParams, Navigate } from 'react-router-dom';
 import {
   ArrowLeft, Bell, CalendarDays, Check, CheckCircle2, ChevronRight,
+  ChevronUp, ChevronDown,
   CircleDollarSign, ClipboardList, Edit, FileWarning, Home, Lock,
   LogIn, LogOut, Menu, MessageSquare, MoreHorizontal, Plus, Search,
   Send, Settings, Users, X, Phone, Mail, MapPin, Building, Tag,
@@ -323,48 +324,22 @@ function UserDetailsModal({ user: initialUser, onClose }) {
   );
 }
 
-function Splash() {
-  const navigate = useNavigate();
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const userStr = localStorage.getItem('user');
-    let target = '/login';
-    if (token && userStr) {
-      try {
-        const u = JSON.parse(userStr);
-        target = u.role === 'admin' ? '/admin/dashboard' : '/partner/dashboard';
-      } catch {}
-    }
-    const t = setTimeout(() => navigate(target), 1400);
-    return () => clearTimeout(t);
-  }, [navigate]);
-
-  return (
-    <div className="splash-container">
-      <div className="splash-building-art">
-        {Array.from({ length: 16 }).map((_, i) => (
-          <div className="splash-window" key={i} />
-        ))}
-      </div>
-
-      <div className="splash-content">
-        <div className="splash-logo-card">
-          <img
-            src="/logo.png"
-            alt="Park Solitaire Lifespaces LLP"
-            className="splash-logo-img"
-          />
-        </div>
-        <div className="splash-badge-sub">Channel Partner & Admin Portal</div>
-      </div>
-    </div>
-  );
-}
-
-function Auth({ children }) {
+function Auth({ children, onBackToCover }) {
   return (
     <div className="auth">
       <div className="authbox">
+        {onBackToCover && (
+          <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+            <button
+              type="button"
+              className="frontpage-back-cover-pill"
+              onClick={onBackToCover}
+            >
+              <ChevronDown size={14} />
+              <span>Back to Cover</span>
+            </button>
+          </div>
+        )}
         <Logo full large />
         {children}
       </div>
@@ -372,16 +347,13 @@ function Auth({ children }) {
   );
 }
 
-function Login() {
+function Login({ onBackToCover }) {
   const navigate = useNavigate();
   const [role, setRole] = useState('partner');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showServerConfig, setShowServerConfig] = useState(false);
-  const [currentServerUrl, setCurrentServerUrl] = useState(getServerUrl());
-  const [inputServerUrl, setInputServerUrl] = useState(getServerUrl());
 
   const handleLogin = async (e) => {
     e?.preventDefault();
@@ -411,7 +383,7 @@ function Login() {
   };
 
   return (
-    <Auth>
+    <Auth onBackToCover={onBackToCover}>
       <div className="tabs" style={{ marginBottom: '20px' }}>
         <button
           type="button"
@@ -476,81 +448,6 @@ function Login() {
         </button>
       </form>
 
-      {/* 1-Click Demo Quick Logins */}
-      <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px dashed #e2e8f0' }}>
-        <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'center', marginBottom: '8px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          ⚡ 1-Click Instant Demo Login
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-          <button
-            type="button"
-            className="btn-sm"
-            style={{
-              padding: '8px 10px',
-              background: '#075c4d',
-              color: '#ffffff',
-              borderRadius: '8px',
-              fontSize: '11.5px',
-              fontWeight: '600',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '4px'
-            }}
-            onClick={async () => {
-              setLoading(true);
-              try {
-                const res = await api.login({ email: 'admin@parksolitaire.com', password: 'admin' });
-                localStorage.setItem('token', res.token);
-                localStorage.setItem('user', JSON.stringify(res.user));
-                navigate('/admin/dashboard');
-              } catch (err) {
-                setError(err.message || 'Login failed');
-              } finally {
-                setLoading(false);
-              }
-            }}
-          >
-            🛡️ Admin Login
-          </button>
-          <button
-            type="button"
-            className="btn-sm"
-            style={{
-              padding: '8px 10px',
-              background: '#0f766e',
-              color: '#ffffff',
-              borderRadius: '8px',
-              fontSize: '11.5px',
-              fontWeight: '600',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '4px'
-            }}
-            onClick={async () => {
-              setLoading(true);
-              try {
-                const res = await api.login({ email: 'cp@realty.com', password: '123' });
-                localStorage.setItem('token', res.token);
-                localStorage.setItem('user', JSON.stringify(res.user));
-                navigate('/partner/dashboard');
-              } catch (err) {
-                setError(err.message || 'Login failed');
-              } finally {
-                setLoading(false);
-              }
-            }}
-          >
-            🤝 C.P Login
-          </button>
-        </div>
-      </div>
-
       {role === 'partner' ? (
         <div className="foot">
           Don't have an account? <Link to="/register">Register</Link>
@@ -562,81 +459,90 @@ function Login() {
           </button>
         </div>
       )}
+    </Auth>
+  );
+}
 
-      {/* Mobile Backend IP Configuration */}
-      <div style={{ marginTop: '16px', textAlign: 'center' }}>
-        <button
-          type="button"
-          onClick={() => setShowServerConfig(!showServerConfig)}
-          style={{
-            background: 'none',
-            border: 'none',
-            color: '#6b7c77',
-            fontSize: '11px',
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '5px',
-            padding: '4px 8px',
-            borderRadius: '4px'
-          }}
-          title="Change Backend Server IP for Phone / Local Network"
+function Splash({ initialSection = 'cover' }) {
+  const containerRef = React.useRef(null);
+  const heroRef = React.useRef(null);
+  const loginRef = React.useRef(null);
+
+  const scrollToLogin = () => {
+    loginRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const scrollToCover = () => {
+    heroRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    if (initialSection === 'login' && loginRef.current) {
+      setTimeout(() => {
+        loginRef.current?.scrollIntoView({ behavior: 'auto' });
+      }, 60);
+    }
+  }, [initialSection]);
+
+  // Handle touch swipe-up on the hero section for mobile gesture support
+  const touchStartY = React.useRef(0);
+  const handleTouchStart = (e) => {
+    touchStartY.current = e.touches[0].clientY;
+  };
+  const handleTouchEnd = (e) => {
+    const deltaY = touchStartY.current - e.changedTouches[0].clientY;
+    if (deltaY > 35) {
+      scrollToLogin();
+    }
+  };
+
+  // Wheel gesture for desktop
+  const handleWheel = (e) => {
+    if (e.deltaY > 15) {
+      scrollToLogin();
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="frontpage-scroll-container">
+      {/* Section 1: Frontpage Hero Cover */}
+      <section
+        ref={heroRef}
+        className="frontpage-hero-section"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onWheel={handleWheel}
+      >
+        {/* Ambient background blur layer filling any aspect ratio or screen width */}
+        <div className="frontpage-ambient-blur" aria-hidden="true" />
+
+        {/* Foreground sharp artwork container */}
+        <div
+          className="frontpage-hero-wrapper"
+          onClick={scrollToLogin}
+          title="Click or scroll up to Login"
         >
-          <Settings size={12} /> Server: <b>{currentServerUrl.replace(/^https?:\/\//, '')}</b>
-        </button>
-      </div>
-
-      {showServerConfig && (
-        <div style={{
-          marginTop: '10px',
-          padding: '12px',
-          background: '#f8fafc',
-          borderRadius: '8px',
-          border: '1px solid #cbd5e1',
-          fontSize: '12px',
-          textAlign: 'left'
-        }}>
-          <label style={{ display: 'block', marginBottom: '4px', fontWeight: '600', color: '#163a33' }}>
-            Backend API IP / URL:
-          </label>
-          <input
-            type="text"
-            value={inputServerUrl}
-            onChange={(e) => setInputServerUrl(e.target.value)}
-            placeholder="http://192.168.1.110:5001/api"
-            style={{ width: '100%', marginBottom: '8px', fontSize: '12px', padding: '6px 8px', boxSizing: 'border-box' }}
+          <img
+            src="/frontpage.jpg"
+            alt="Park Solitaire Lifespaces LLP - Channel Partner & Admin App"
+            className="frontpage-hero-img"
           />
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-            <button
-              type="button"
-              className="btn-sm"
-              onClick={() => {
-                setServerUrl('');
-                setCurrentServerUrl(getServerUrl());
-                setInputServerUrl(getServerUrl());
-                setShowServerConfig(false);
-              }}
-              style={{ fontSize: '11px', padding: '4px 8px', background: '#f1f5f9', border: '1px solid #cbd5e1' }}
-            >
-              Reset Default
-            </button>
-            <button
-              type="button"
-              className="btn-sm btn-primary"
-              onClick={() => {
-                setServerUrl(inputServerUrl);
-                setCurrentServerUrl(getServerUrl());
-                setShowServerConfig(false);
-                alert(`Server IP saved: ${getServerUrl()}`);
-              }}
-              style={{ fontSize: '11px', padding: '4px 10px' }}
-            >
-              Save IP
-            </button>
+        </div>
+
+        {/* Floating animated scroll pill */}
+        <div className="frontpage-scroll-indicator" onClick={scrollToLogin}>
+          <div className="frontpage-scroll-pill">
+            <ChevronUp size={16} className="frontpage-chevron-bounce" />
+            <span>Scroll up to Login</span>
           </div>
         </div>
-      )}
-    </Auth>
+      </section>
+
+      {/* Section 2: Login Portal */}
+      <section ref={loginRef} className="frontpage-login-section">
+        <Login onBackToCover={scrollToCover} />
+      </section>
+    </div>
   );
 }
 
@@ -4693,8 +4599,8 @@ function App() {
   return (
     <UserModalContext.Provider value={{ openUserDetails }}>
       <Routes>
-        <Route path="/" element={<Splash />} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<Splash initialSection="cover" />} />
+        <Route path="/login" element={<Splash initialSection="login" />} />
         <Route path="/register" element={<Register />} />
 
         {/* Direct Shortcuts / Aliases */}
