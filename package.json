@@ -2,6 +2,8 @@
   "name": "park-solitaire-crm",
   "private": true,
   "scripts": {
+    "dev": "npm --prefix park-solitaire-frontend run dev",
+    "dev:backend": "npm --prefix park-solitaire-backend run dev",
     "build": "cd park-solitaire-frontend && npm install && npm run build"
   }
 }
