@@ -98,14 +98,14 @@ export async function payBill(req, res, next) {
       return res.status(403).json({ message: 'Only Admin has authority to process payments.' });
     }
 
-    const { paid_date, payment_reference } = req.body || {};
+    const { paid_date, payment_reference, transaction_id, transactionId } = req.body || {};
     const [existing] = await pool.query('SELECT * FROM bills WHERE id = ?', [req.params.id]);
     if (existing.length === 0) {
       return res.status(404).json({ message: 'Bill not found' });
     }
 
     const effectivePaidDate = paid_date || new Date().toISOString().slice(0, 10);
-    const ref = payment_reference || 'Online Bank Transfer';
+    const ref = payment_reference || transaction_id || transactionId || 'Online Bank Transfer';
 
     await pool.query(
       `UPDATE bills SET status = 'paid', paid_date = ?, payment_reference = ? WHERE id = ?`,
@@ -122,6 +122,9 @@ export async function payBill(req, res, next) {
     `, [req.params.id]);
 
     const updatedBill = rows[0];
+    if (updatedBill) {
+      updatedBill.transaction_id = updatedBill.payment_reference;
+    }
 
     broadcastEvent('BILL_PAID', {
       bill: updatedBill,
