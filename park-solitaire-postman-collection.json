@@ -13,7 +13,7 @@
     },
     {
       "key": "token",
-      "value": "",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwibmFtZSI6IkFkbWluIiwiZmlybV9uYW1lIjoiUGFyayBTb2xpdGFpcmUgTWFuYWdlbWVudCIsImVtYWlsIjoiYWRtaW5AcGFya3NvbGl0YWlyZS5jb20iLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3OTAyNTMxNTMsImV4cCI6MTc5MDg1Nzk1M30.QUv1c9uFl4c-rHvlHPweXhM6KseIMjDfQ6Wp-bFCdHg",
       "type": "string"
     }
   ],
