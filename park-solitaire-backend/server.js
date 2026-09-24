@@ -37,7 +37,7 @@ const apiInfo = {
       me: 'GET /api/auth/me'
     },
     clients: 'GET|POST /api/clients, GET|PUT|DELETE /api/clients/:id',
-    visits: 'GET|POST /api/visits, PUT|DELETE /api/visits/:id',
+    visits: 'GET|POST /api/visits, GET|PUT|DELETE /api/visits/:id',
     complaints: 'GET|POST /api/complaints, PUT|DELETE /api/complaints/:id',
     payments: 'GET|POST /api/payments, PUT|DELETE /api/payments/:id',
     admin: 'GET /api/admin/dashboard, GET|POST /api/admin/partners, PUT /api/admin/partners/:id/status'
