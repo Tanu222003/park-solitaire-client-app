@@ -317,6 +317,278 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "5. Complaints & Support Tickets",
+      "item": [
+        {
+          "name": "Get All Complaints",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/complaints",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "complaints"]
+            },
+            "description": "Retrieves all complaints (filtered by partner for CP, all for Admin)."
+          },
+          "response": []
+        },
+        {
+          "name": "Raise New Complaint",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_id\": 9,\n  \"subject\": \"Delayed site visit feedback\",\n  \"description\": \"Client requested follow-up on 2 BHK pricing breakdown and floor plan\",\n  \"status\": \"open\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/complaints",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "complaints"]
+            },
+            "description": "Raises a new complaint or support ticket for a client."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Complaint / Reply (Admin or CP)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"resolved\",\n  \"admin_reply\": \"Site manager contacted client with detailed pricing brochure and answered queries.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/complaints/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "complaints", "1"]
+            },
+            "description": "Updates status of complaint or appends admin reply (open, in_progress, resolved)."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Complaint",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/complaints/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "complaints", "1"]
+            },
+            "description": "Deletes a complaint ticket."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. Payments & Collections",
+      "item": [
+        {
+          "name": "Get All Payments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments"]
+            },
+            "description": "Lists all payment records (filtered by partner for CP, all for Admin)."
+          },
+          "response": []
+        },
+        {
+          "name": "Record New Client Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_id\": 9,\n  \"amount\": 500000,\n  \"due_date\": \"2026-10-15\",\n  \"paid_date\": \"2026-09-24\",\n  \"status\": \"paid\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments"]
+            },
+            "description": "Records a client payment installment (status: pending, paid, overdue)."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Payment Record",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 500000,\n  \"paid_date\": \"2026-09-24\",\n  \"status\": \"paid\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments", "1"]
+            },
+            "description": "Updates payment amount, dates, or status."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Payment",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments", "1"]
+            },
+            "description": "Deletes a payment entry."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. Bills & Brokerage Invoices",
+      "item": [
+        {
+          "name": "Get All Bills",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bills",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bills"]
+            },
+            "description": "Lists all C.P brokerage bills (pending, paid, rejected)."
+          },
+          "response": []
+        },
+        {
+          "name": "Raise C.P Brokerage Bill",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client_id\": 9,\n  \"client_name\": \"Rohan Mehta\",\n  \"purchase_details\": \"Flat 802, Park Solitaire Wing B\",\n  \"agreement_value\": 15000000,\n  \"brokerage_percent\": 2.0,\n  \"account_holder_name\": \"Solitaire Realty Group\",\n  \"account_no\": \"123456789012\",\n  \"ifsc_code\": \"HDFC0001234\",\n  \"branch\": \"Andheri West, Mumbai\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bills",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bills"]
+            },
+            "description": "Channel Partner raises a brokerage bill for closed client booking."
+          },
+          "response": []
+        },
+        {
+          "name": "Admin Approve & Pay Bill",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paid_date\": \"2026-09-24\",\n  \"payment_reference\": \"NEFT-UTR9876543210\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bills/1/pay",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bills", "1", "pay"]
+            },
+            "description": "Admin marks brokerage bill as Paid and records bank reference."
+          },
+          "response": []
+        }
+      ]
     }
   ]
 }
