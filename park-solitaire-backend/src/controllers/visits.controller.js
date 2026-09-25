@@ -117,8 +117,8 @@ export async function createVisit(req, res, next) {
       );
     } else {
       const [result] = await pool.query(
-        'INSERT INTO visits (client_id, partner_id, visit_date, visit_time, notes, status) VALUES (?, ?, ?, ?, ?, ?)',
-        [client_id, partnerId, visit_date, visit_time || null, notes || null, status || 'Upcoming']
+        'INSERT INTO visits (client_id, client_name, partner_id, visit_date, visit_time, notes, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [client_id, clientRows[0].name, partnerId, visit_date, visit_time || null, notes || null, status || 'Upcoming']
       );
       visitId = result.insertId;
     }

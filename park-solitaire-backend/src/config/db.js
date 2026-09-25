@@ -120,14 +120,14 @@ export async function initDatabase() {
       if (todayCount[0].c === 0) {
         const c1 = clients[0];
         await connection.query(
-          'INSERT INTO visits (client_id, partner_id, visit_date, visit_time, notes, status) VALUES (?, ?, CURDATE(), ?, ?, ?)',
-          [c1.id, c1.partner_id, '11:30 AM', 'Site tour of 2 BHK luxury show apartment & premium amenities', 'scheduled']
+          'INSERT INTO visits (client_id, client_name, partner_id, visit_date, visit_time, notes, status) VALUES (?, ?, ?, CURDATE(), ?, ?, ?)',
+          [c1.id, c1.name, c1.partner_id, '11:30 AM', 'Site tour of 2 BHK luxury show apartment & premium amenities', 'scheduled']
         );
         if (clients.length > 1) {
           const c2 = clients[1];
           await connection.query(
-            'INSERT INTO visits (client_id, partner_id, visit_date, visit_time, notes, status) VALUES (?, ?, CURDATE(), ?, ?, ?)',
-            [c2.id, c2.partner_id, '03:45 PM', 'Client walkthrough with family for corner unit & master layout', 'scheduled']
+            'INSERT INTO visits (client_id, client_name, partner_id, visit_date, visit_time, notes, status) VALUES (?, ?, ?, CURDATE(), ?, ?, ?)',
+            [c2.id, c2.name, c2.partner_id, '03:45 PM', 'Client walkthrough with family for corner unit & master layout', 'scheduled']
           );
         }
       }
@@ -135,14 +135,14 @@ export async function initDatabase() {
       if (tomorrowCount[0].c === 0) {
         const c3 = clients.length > 2 ? clients[2] : clients[0];
         await connection.query(
-          'INSERT INTO visits (client_id, partner_id, visit_date, visit_time, notes, status) VALUES (?, ?, DATE_ADD(CURDATE(), INTERVAL 1 DAY), ?, ?, ?)',
-          [c3.id, c3.partner_id, '10:15 AM', 'Meeting on 3 BHK pricing breakdown and payment schedule', 'scheduled']
+          'INSERT INTO visits (client_id, client_name, partner_id, visit_date, visit_time, notes, status) VALUES (?, ?, ?, DATE_ADD(CURDATE(), INTERVAL 1 DAY), ?, ?, ?)',
+          [c3.id, c3.name, c3.partner_id, '10:15 AM', 'Meeting on 3 BHK pricing breakdown and payment schedule', 'scheduled']
         );
         if (clients.length > 3) {
           const c4 = clients[3];
           await connection.query(
-            'INSERT INTO visits (client_id, partner_id, visit_date, visit_time, notes, status) VALUES (?, ?, DATE_ADD(CURDATE(), INTERVAL 1 DAY), ?, ?, ?)',
-            [c4.id, c4.partner_id, '04:30 PM', 'Floor layout selection and booking advance token review', 'scheduled']
+            'INSERT INTO visits (client_id, client_name, partner_id, visit_date, visit_time, notes, status) VALUES (?, ?, ?, DATE_ADD(CURDATE(), INTERVAL 1 DAY), ?, ?, ?)',
+            [c4.id, c4.name, c4.partner_id, '04:30 PM', 'Floor layout selection and booking advance token review', 'scheduled']
           );
         }
       }

@@ -92,8 +92,8 @@ export async function createClient(req, res, next) {
     const defaultNotes = visit_notes || `New client registered by ${createdClient.partner_name || 'Channel Partner'} (${createdClient.unit_type || 'Unit'})`;
 
     const [vResult] = await pool.query(
-      'INSERT INTO visits (client_id, partner_id, visit_date, visit_time, notes, status) VALUES (?, ?, ?, ?, ?, ?)',
-      [clientId, req.user.id, targetVisitDate, visit_time || '11:00 AM', defaultNotes, 'Upcoming']
+      'INSERT INTO visits (client_id, client_name, partner_id, visit_date, visit_time, notes, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [clientId, name, req.user.id, targetVisitDate, visit_time || '11:00 AM', defaultNotes, 'Upcoming']
     );
 
     const [vRows] = await pool.query(`
