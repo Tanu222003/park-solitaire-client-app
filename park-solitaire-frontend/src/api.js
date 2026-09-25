@@ -769,11 +769,31 @@ function handleMockRequest(endpoint, options = {}) {
 // -------------------------------------------------------------
 async function request(endpoint, options = {}) {
   let token = localStorage.getItem("token");
+  
+  // Clean up any stale or mock tokens
   if (token && token.startsWith("demo-jwt-token-")) {
-    console.warn("Removing legacy mock demo token to enforce live cloud API authentication");
+    console.warn("Purging legacy mock demo token to enforce live cloud API authentication");
     localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    localStorage.removeItem("ps_demo_store");
     token = null;
+    if (typeof window !== "undefined" && window.location && !window.location.pathname.includes("/login")) {
+      const isAdmin = window.location.pathname.startsWith("/admin");
+      window.location.href = isAdmin ? "/admin/login?expired=1" : "/login?expired=1";
+      return;
+    }
   }
+
+  // Check auth requirement for protected endpoints
+  const isPublic = endpoint.startsWith("/auth/login") || endpoint.startsWith("/auth/register") || endpoint === "/health";
+  if (!token && !isPublic) {
+    if (typeof window !== "undefined" && window.location && !window.location.pathname.includes("/login")) {
+      const isAdmin = window.location.pathname.startsWith("/admin");
+      window.location.href = isAdmin ? "/admin/login?auth=required" : "/login?auth=required";
+    }
+    throw new Error("Authentication required. Please log in.");
+  }
+
   const baseUrl = getBaseUrl();
 
   // If no base URL is defined (e.g. offline static preview without cloud backend):
@@ -800,13 +820,24 @@ async function request(endpoint, options = {}) {
 
     if (!response.ok) {
       if (response.status === 401 && !endpoint.includes("/auth/login")) {
-        console.warn("Session token expired or invalid (401). Clearing token.");
+        console.warn("Session token expired or invalid (401). Clearing session and redirecting.");
         localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        localStorage.removeItem("ps_demo_store");
+        if (typeof window !== "undefined" && window.location && !window.location.pathname.includes("/login")) {
+          const isAdmin = window.location.pathname.startsWith("/admin");
+          window.location.href = isAdmin ? "/admin/login?expired=1" : "/login?expired=1";
+        }
       }
       const error = new Error(data.message || `Request failed with status ${response.status}`);
       error.status = response.status;
       error.data = data;
       throw error;
+    }
+
+    const method = (options.method || "GET").toUpperCase();
+    if (method !== "GET") {
+      console.log(`[Cloud MySQL API] ${method} ${endpoint} -> 200 OK`, data);
     }
 
     return data;

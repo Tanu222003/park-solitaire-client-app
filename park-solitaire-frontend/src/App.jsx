@@ -383,6 +383,13 @@ function Login({ defaultRole = 'partner' }) {
   useEffect(() => {
     if (defaultRole) {
       setRole(defaultRole);
+    }
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('expired') === '1') {
+      setError('Your previous session expired or was reset. Please log in to connect directly to Railway MySQL.');
+    } else if (params.get('auth') === 'required') {
+      setError('Please log in with your credentials to access and update database records.');
+    } else {
       setError('');
     }
   }, [defaultRole]);
