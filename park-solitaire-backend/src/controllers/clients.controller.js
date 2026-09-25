@@ -38,7 +38,7 @@ export async function getClientById(req, res, next) {
       FROM visits v
       LEFT JOIN users u ON u.id = v.partner_id
       WHERE v.client_id = ?
-      ORDER BY v.visit_date DESC, v.id DESC
+      ORDER BY v.updated_at DESC, v.id DESC
     `, [client.id]);
     const [complaints] = await pool.query('SELECT * FROM complaints WHERE client_id = ? ORDER BY created_at DESC', [client.id]);
     const [payments] = await pool.query('SELECT * FROM payments WHERE client_id = ? ORDER BY created_at DESC', [client.id]);

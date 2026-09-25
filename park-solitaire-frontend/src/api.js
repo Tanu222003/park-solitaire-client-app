@@ -588,9 +588,11 @@ function handleMockRequest(endpoint, options = {}) {
     const id = parseInt(endpoint.split("/")[2]);
     const idx = store.visits.findIndex((v) => Number(v.id) === id);
     if (idx !== -1) {
-      store.visits[idx] = { ...store.visits[idx], ...body };
+      const updated = { ...store.visits[idx], ...body, updated_at: new Date().toISOString() };
+      store.visits.splice(idx, 1);
+      store.visits.unshift(updated);
       saveDemoStore(store);
-      return store.visits[idx];
+      return updated;
     }
     return body;
   }

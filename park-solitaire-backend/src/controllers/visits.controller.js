@@ -25,7 +25,7 @@ export async function getVisits(req, res, next) {
       LEFT JOIN clients c ON c.id = v.client_id
       LEFT JOIN users u ON u.id = v.partner_id
       ${isAdmin ? '' : 'WHERE v.partner_id = ?'}
-      ORDER BY v.visit_date DESC, v.id DESC
+      ORDER BY v.updated_at DESC, v.id DESC
     `;
     const [rows] = await pool.query(sql, isAdmin ? [] : [req.user.id]);
     res.json(rows);
@@ -173,7 +173,8 @@ export async function updateVisit(req, res, next) {
          visit_date = COALESCE(?, visit_date),
          visit_time = COALESCE(?, visit_time),
          notes      = COALESCE(?, notes),
-         status     = COALESCE(?, status)
+         status     = COALESCE(?, status),
+         updated_at = NOW()
        WHERE id = ?`,
       [visit_date ?? null, visit_time ?? null, notes ?? null, status ?? null, req.params.id]
     );

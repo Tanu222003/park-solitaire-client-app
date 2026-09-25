@@ -1104,9 +1104,16 @@ function ClientVisitsWidget({
 }) {
   const [activeTab, setActiveTab] = useState('today');
 
-  const todayVisits = visits.filter((v) => getVisitDayClassification(v.visit_date).isToday);
-  const tomorrowVisits = visits.filter((v) => getVisitDayClassification(v.visit_date).isTomorrow);
-  const currentList = activeTab === 'today' ? todayVisits : (activeTab === 'tomorrow' ? tomorrowVisits : visits);
+  const sortByUpdated = (list) => [...list].sort((a, b) => {
+    const timeA = new Date(a.updated_at || a.created_at || a.visit_date || 0).getTime();
+    const timeB = new Date(b.updated_at || b.created_at || b.visit_date || 0).getTime();
+    return timeB - timeA;
+  });
+
+  const sortedVisits = sortByUpdated(visits);
+  const todayVisits = sortedVisits.filter((v) => getVisitDayClassification(v.visit_date).isToday);
+  const tomorrowVisits = sortedVisits.filter((v) => getVisitDayClassification(v.visit_date).isTomorrow);
+  const currentList = activeTab === 'today' ? todayVisits : (activeTab === 'tomorrow' ? tomorrowVisits : sortedVisits);
 
   const now = new Date();
   const tmrw = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
@@ -1399,12 +1406,22 @@ function Dashboard({ admin = false }) {
 
   const handleUpdateVisitStatus = async (visitId, newStatus) => {
     try {
+      const nowIso = new Date().toISOString();
+      setVisits((prev) => {
+        const target = prev.find((v) => Number(v.id) === Number(visitId));
+        if (!target) return prev;
+        const updated = { ...target, status: newStatus, updated_at: nowIso };
+        const others = prev.filter((v) => Number(v.id) !== Number(visitId));
+        return [updated, ...others];
+      });
+
       await api.updateVisit(visitId, { status: newStatus });
       setToast(`Visit marked as ${newStatus}!`);
       setTimeout(() => setToast(''), 3500);
       loadDashboardData();
     } catch (err) {
       alert(err.message || 'Failed to update visit status');
+      loadDashboardData();
     }
   };
 
@@ -2432,7 +2449,11 @@ function ClientVisitJourneyChart({
             </div>
           ) : (
             <div className="timeline">
-              {visits.map((v) => {
+              {[...visits].sort((a, b) => {
+                const timeA = new Date(a.updated_at || a.created_at || a.visit_date || 0).getTime();
+                const timeB = new Date(b.updated_at || b.created_at || b.visit_date || 0).getTime();
+                return timeB - timeA;
+              }).map((v) => {
                 const dayClass = getVisitDayClassification(v.visit_date);
                 const dateDisplay = dayClass.formattedDate || new Date(v.visit_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -2519,6 +2540,19 @@ function Details() {
 
   const handleVisitStatusChange = async (visitId, newStatus) => {
     try {
+      const nowIso = new Date().toISOString();
+      setClient((prev) => {
+        if (!prev || !prev.visits) return prev;
+        const target = prev.visits.find((v) => Number(v.id) === Number(visitId));
+        if (!target) return prev;
+        const updated = { ...target, status: newStatus, updated_at: nowIso };
+        const others = prev.visits.filter((v) => Number(v.id) !== Number(visitId));
+        return {
+          ...prev,
+          visits: [updated, ...others]
+        };
+      });
+
       await api.updateVisit(visitId, { status: newStatus });
       setToast(`Visit status updated to "${newStatus}" in MySQL!`);
       setTimeout(() => setToast(''), 4000);
@@ -2526,6 +2560,7 @@ function Details() {
       window.dispatchEvent(new CustomEvent('portal-refresh'));
     } catch (err) {
       alert(err.message || 'Failed to update visit status');
+      loadClient();
     }
   };
 
@@ -2710,7 +2745,11 @@ function Details() {
             </div>
           ) : (
             <div className="timeline">
-              {client.visits.map((v) => (
+              {[...client.visits].sort((a, b) => {
+                const timeA = new Date(a.updated_at || a.created_at || a.visit_date || 0).getTime();
+                const timeB = new Date(b.updated_at || b.created_at || b.visit_date || 0).getTime();
+                return timeB - timeA;
+              }).map((v) => (
                 <div className="visit" key={v.id}>
                   <span className="dot" />
                   <div>
@@ -3042,6 +3081,15 @@ function Visits() {
 
   const handleStatusChange = async (visitId, newStatus) => {
     try {
+      const nowIso = new Date().toISOString();
+      setVisits((prev) => {
+        const target = prev.find((v) => Number(v.id) === Number(visitId));
+        if (!target) return prev;
+        const updated = { ...target, status: newStatus, updated_at: nowIso };
+        const others = prev.filter((v) => Number(v.id) !== Number(visitId));
+        return [updated, ...others];
+      });
+
       await api.updateVisit(visitId, { status: newStatus });
       setToast(`Visit status updated to "${newStatus}" in MySQL!`);
       setTimeout(() => setToast(''), 4000);
@@ -3049,6 +3097,7 @@ function Visits() {
       window.dispatchEvent(new CustomEvent('portal-refresh'));
     } catch (err) {
       alert(err.message || 'Failed to update visit status');
+      loadData(false);
     }
   };
 
@@ -3061,10 +3110,17 @@ function Visits() {
     return (v.status || 'Upcoming').toLowerCase() === statusFilter.toLowerCase();
   });
 
+  // Sort visits so the latest updated visit is on the top of the stack
+  const sortedFilteredVisits = [...filteredVisits].sort((a, b) => {
+    const timeA = new Date(a.updated_at || a.created_at || a.visit_date || 0).getTime();
+    const timeB = new Date(b.updated_at || b.created_at || b.visit_date || 0).getTime();
+    return timeB - timeA;
+  });
+
   // Deduplicate by client_id so that a single client is never displayed multiple times
   const displayedVisits = [];
   const seenClientIds = new Set();
-  filteredVisits.forEach((v) => {
+  sortedFilteredVisits.forEach((v) => {
     const key = v.client_id ? Number(v.client_id) : `v-${v.id}`;
     if (!seenClientIds.has(key)) {
       seenClientIds.add(key);
