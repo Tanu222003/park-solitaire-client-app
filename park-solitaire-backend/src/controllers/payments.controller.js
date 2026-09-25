@@ -54,7 +54,7 @@ export async function updatePayment(req, res, next) {
     const { amount, due_date, paid_date, status } = req.body || {};
     const [existing] = await pool.query('SELECT partner_id FROM payments WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ message: 'Payment not found' });
-    if (req.user.role !== 'admin' && existing[0].partner_id !== req.user.id) {
+    if (req.user.role !== 'admin' && Number(existing[0].partner_id) !== Number(req.user.id)) {
       return res.status(403).json({ message: 'Not your payment' });
     }
 
@@ -83,7 +83,7 @@ export async function deletePayment(req, res, next) {
   try {
     const [existing] = await pool.query('SELECT partner_id FROM payments WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ message: 'Payment not found' });
-    if (req.user.role !== 'admin' && existing[0].partner_id !== req.user.id) {
+    if (req.user.role !== 'admin' && Number(existing[0].partner_id) !== Number(req.user.id)) {
       return res.status(403).json({ message: 'Not your payment' });
     }
 

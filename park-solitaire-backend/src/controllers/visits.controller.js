@@ -161,13 +161,12 @@ export async function createVisit(req, res, next) {
 
 export async function updateVisit(req, res, next) {
   try {
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Only Admin has authority to update visit status.' });
-    }
-
     const { visit_date, visit_time, notes, status } = req.body || {};
     const [existing] = await pool.query('SELECT partner_id FROM visits WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ message: 'Visit not found' });
+    if (req.user.role !== 'admin' && Number(existing[0].partner_id) !== Number(req.user.id)) {
+      return res.status(403).json({ message: 'You can only update visits for your own clients.' });
+    }
 
     await pool.query(
       `UPDATE visits SET

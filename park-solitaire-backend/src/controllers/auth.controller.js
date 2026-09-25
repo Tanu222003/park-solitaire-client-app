@@ -53,10 +53,19 @@ export async function login(req, res, next) {
     }
 
     const cleanIdentifier = String(email).trim();
-    // Allow login by email OR mobile phone / alternate phone
+    const digitsOnly = cleanIdentifier.replace(/\D/g, '');
+    const last10 = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
+
+    // Allow login by email OR mobile phone / alternate phone (any formatting)
     let [rows] = await pool.query(
-      'SELECT * FROM users WHERE email = ? OR phone = ? OR phone2 = ? OR REPLACE(phone, " ", "") = ? OR REPLACE(phone, "+91", "") = ?',
-      [cleanIdentifier, cleanIdentifier, cleanIdentifier, cleanIdentifier.replace(/\s+/g, ''), cleanIdentifier.replace(/^\+91/, '').trim()]
+      `SELECT * FROM users 
+       WHERE email = ? 
+          OR phone = ? 
+          OR phone2 = ? 
+          OR REPLACE(phone, ' ', '') = ? 
+          OR (LENGTH(?) >= 10 AND RIGHT(REPLACE(REPLACE(phone, ' ', ''), '+91', ''), 10) = ?)
+          OR (LENGTH(?) >= 10 AND RIGHT(REPLACE(REPLACE(phone2, ' ', ''), '+91', ''), 10) = ?)`,
+      [cleanIdentifier, cleanIdentifier, cleanIdentifier, cleanIdentifier.replace(/\s+/g, ''), last10, last10, last10, last10]
     );
 
     if (rows.length === 0 && cleanIdentifier.toLowerCase() === 'admin') {

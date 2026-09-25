@@ -151,7 +151,7 @@ export async function updateClient(req, res, next) {
     const { name, phone, email, address, unit_type, budget, source, status } = req.body || {};
     const [existing] = await pool.query('SELECT partner_id FROM clients WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ message: 'Client not found' });
-    if (req.user.role !== 'admin' && existing[0].partner_id !== req.user.id) {
+    if (req.user.role !== 'admin' && Number(existing[0].partner_id) !== Number(req.user.id)) {
       return res.status(403).json({ message: 'Not your client' });
     }
 
