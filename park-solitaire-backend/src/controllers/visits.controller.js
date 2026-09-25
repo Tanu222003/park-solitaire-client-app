@@ -1,6 +1,24 @@
 import pool from '../config/db.js';
 import { broadcastEvent } from '../config/events.js';
 
+const STAGE_ORDER = {
+  upcoming: 0,
+  scheduled: 0,
+  upcomingvisit: 0,
+  visited: 1,
+  completed: 1,
+  followup: 2,
+  revisited: 3,
+  booked: 4,
+  closed: 5
+};
+
+export function getStageWeight(st) {
+  if (!st) return 0;
+  const clean = String(st).toLowerCase().replace(/[\s-_]/g, '');
+  return STAGE_ORDER[clean] ?? 0;
+}
+
 export async function getVisits(req, res, next) {
   try {
     const isAdmin = req.user.role === 'admin';
@@ -162,10 +180,20 @@ export async function createVisit(req, res, next) {
 export async function updateVisit(req, res, next) {
   try {
     const { visit_date, visit_time, notes, status } = req.body || {};
-    const [existing] = await pool.query('SELECT partner_id FROM visits WHERE id = ?', [req.params.id]);
+    const [existing] = await pool.query('SELECT partner_id, status FROM visits WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ message: 'Visit not found' });
     if (req.user.role !== 'admin' && Number(existing[0].partner_id) !== Number(req.user.id)) {
       return res.status(403).json({ message: 'You can only update visits for your own clients.' });
+    }
+
+    if (status) {
+      const currentWeight = getStageWeight(existing[0].status);
+      const targetWeight = getStageWeight(status);
+      if (targetWeight < currentWeight) {
+        return res.status(400).json({
+          message: `Cannot revert visit status backwards in the flow from "${existing[0].status}" to "${status}". Progression is strictly forward.`
+        });
+      }
     }
 
     await pool.query(

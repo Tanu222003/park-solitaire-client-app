@@ -588,6 +588,15 @@ function handleMockRequest(endpoint, options = {}) {
     const id = parseInt(endpoint.split("/")[2]);
     const idx = store.visits.findIndex((v) => Number(v.id) === id);
     if (idx !== -1) {
+      if (body.status) {
+        const STAGE_ORDER = { upcoming: 0, scheduled: 0, visited: 1, completed: 1, followup: 2, revisited: 3, booked: 4, closed: 5 };
+        const getWeight = (st) => STAGE_ORDER[String(st || '').toLowerCase().replace(/[\s-_]/g, '')] ?? 0;
+        if (getWeight(body.status) < getWeight(store.visits[idx].status)) {
+          const err = new Error(`Cannot revert visit status backwards in the flow from "${store.visits[idx].status}" to "${body.status}".`);
+          err.status = 400;
+          throw err;
+        }
+      }
       const updated = { ...store.visits[idx], ...body, updated_at: new Date().toISOString() };
       store.visits.splice(idx, 1);
       store.visits.unshift(updated);

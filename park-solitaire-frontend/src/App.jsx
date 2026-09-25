@@ -1093,6 +1093,25 @@ function getVisitDayClassification(visitDate) {
   return { isToday: false, isTomorrow: false, formattedDate: datePrefix };
 }
 
+const VISIT_STAGES_FLOW = ['Upcoming', 'Visited', 'FollowUp', 'Revisited', 'Booked', 'Closed'];
+
+function getStageWeight(st) {
+  if (!st) return 0;
+  const clean = String(st).toLowerCase().replace(/[\s-_]/g, '');
+  if (clean === 'upcoming' || clean === 'scheduled' || clean === 'upcomingvisit') return 0;
+  if (clean === 'visited' || clean === 'completed') return 1;
+  if (clean === 'followup') return 2;
+  if (clean === 'revisited') return 3;
+  if (clean === 'booked') return 4;
+  if (clean === 'closed') return 5;
+  return 0;
+}
+
+function getForwardStages(currentStatus) {
+  const currentWeight = getStageWeight(currentStatus);
+  return VISIT_STAGES_FLOW.filter((st) => getStageWeight(st) >= currentWeight);
+}
+
 function ClientVisitsWidget({
   admin = false,
   visits = [],
@@ -1237,7 +1256,7 @@ function ClientVisitsWidget({
                         style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: '600', color: '#075c4d' }}
                         title="Update visit status in MySQL"
                       >
-                        {['Upcoming', 'Visited', 'FollowUp', 'Revisited', 'Booked', 'Closed'].map((st) => (
+                        {getForwardStages(v.status).map((st) => (
                           <option key={st} value={st}>{st}</option>
                         ))}
                       </select>
@@ -1406,6 +1425,16 @@ function Dashboard({ admin = false }) {
 
   const handleUpdateVisitStatus = async (visitId, newStatus) => {
     try {
+      const currentVisit = visits.find((v) => Number(v.id) === Number(visitId));
+      if (currentVisit) {
+        const curW = getStageWeight(currentVisit.status);
+        const tgtW = getStageWeight(newStatus);
+        if (tgtW < curW) {
+          alert(`Cannot revert visit status backwards in the flow from "${currentVisit.status}" to "${newStatus}". Progression is strictly forward.`);
+          return;
+        }
+      }
+
       const nowIso = new Date().toISOString();
       setVisits((prev) => {
         const target = prev.find((v) => Number(v.id) === Number(visitId));
@@ -2398,11 +2427,22 @@ function ClientVisitJourneyChart({
                 className={`journey-step-node ${isCompleted ? 'step-completed' : ''} ${isCurrent ? 'step-current' : ''} ${isPending ? 'step-pending' : ''}`}
                 onClick={() => {
                   if (visits.length > 0 && onUpdateStatus) {
+                    if (idx < currentStageIndex) {
+                      alert(`Cannot revert visit status backwards in the flow from "${currentStageObj.title}" to "${st.title}". Progression is strictly forward.`);
+                      return;
+                    }
                     onUpdateStatus(visits[0].id, st.key);
                   }
                 }}
-                style={{ cursor: visits.length > 0 && onUpdateStatus ? 'pointer' : 'default' }}
-                title={`Click to update client visit stage to "${st.title}" in MySQL`}
+                style={{
+                  cursor: visits.length > 0 && onUpdateStatus ? (idx < currentStageIndex ? 'not-allowed' : 'pointer') : 'default',
+                  opacity: idx < currentStageIndex ? 0.8 : 1
+                }}
+                title={
+                  idx < currentStageIndex
+                    ? `Stage "${st.title}" is already completed (flow is strictly forward-only)`
+                    : `Click to update client visit stage to "${st.title}" in MySQL`
+                }
               >
                 {idx < STAGES.length - 1 && (
                   <div className={`step-connector ${idx < currentStageIndex ? 'connector-done' : ''}`} />
@@ -2479,7 +2519,7 @@ function ClientVisitJourneyChart({
                               style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: '600', color: '#075c4d' }}
                               title="Update visit status in MySQL"
                             >
-                              {['Upcoming', 'Visited', 'FollowUp', 'Revisited', 'Booked', 'Closed'].map((st) => (
+                              {getForwardStages(v.status).map((st) => (
                                 <option key={st} value={st}>{st}</option>
                               ))}
                             </select>
@@ -2540,6 +2580,16 @@ function Details() {
 
   const handleVisitStatusChange = async (visitId, newStatus) => {
     try {
+      const currentVisit = client?.visits?.find((v) => Number(v.id) === Number(visitId));
+      if (currentVisit) {
+        const curW = getStageWeight(currentVisit.status);
+        const tgtW = getStageWeight(newStatus);
+        if (tgtW < curW) {
+          alert(`Cannot revert visit status backwards in the flow from "${currentVisit.status}" to "${newStatus}". Progression is strictly forward.`);
+          return;
+        }
+      }
+
       const nowIso = new Date().toISOString();
       setClient((prev) => {
         if (!prev || !prev.visits) return prev;
@@ -2769,7 +2819,7 @@ function Details() {
                           style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: '600', color: '#075c4d' }}
                           title="Update visit status in MySQL"
                         >
-                          {['Upcoming', 'Visited', 'FollowUp', 'Revisited', 'Booked', 'Closed'].map((st) => (
+                          {getForwardStages(v.status).map((st) => (
                             <option key={st} value={st}>{st}</option>
                           ))}
                         </select>
@@ -3081,6 +3131,16 @@ function Visits() {
 
   const handleStatusChange = async (visitId, newStatus) => {
     try {
+      const currentVisit = visits.find((v) => Number(v.id) === Number(visitId));
+      if (currentVisit) {
+        const curW = getStageWeight(currentVisit.status);
+        const tgtW = getStageWeight(newStatus);
+        if (tgtW < curW) {
+          alert(`Cannot revert visit status backwards in the flow from "${currentVisit.status}" to "${newStatus}". Progression is strictly forward.`);
+          return;
+        }
+      }
+
       const nowIso = new Date().toISOString();
       setVisits((prev) => {
         const target = prev.find((v) => Number(v.id) === Number(visitId));
@@ -3226,7 +3286,7 @@ function Visits() {
                           style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: '600', color: '#075c4d' }}
                           title="Update visit status in MySQL"
                         >
-                          {['Upcoming', 'Visited', 'FollowUp', 'Revisited', 'Booked', 'Closed'].map((st) => (
+                          {getForwardStages(v.status).map((st) => (
                             <option key={st} value={st}>{st}</option>
                           ))}
                         </select>
