@@ -2471,7 +2471,7 @@ function ClientVisitJourneyChart({
                           <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
                             {v.status || 'Upcoming'}
                           </span>
-                          {onUpdateStatus && (
+                          {!isAdmin && onUpdateStatus && (
                             <select
                               className="status-dropdown"
                               value={v.status || 'Upcoming'}
@@ -3218,17 +3218,19 @@ function Visits() {
                       <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
                         {v.status || 'Upcoming'}
                       </span>
-                      <select
-                        className="status-dropdown"
-                        value={v.status || 'Upcoming'}
-                        onChange={(e) => handleStatusChange(v.id, e.target.value)}
-                        style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: '600', color: '#075c4d' }}
-                        title="Update visit status in MySQL"
-                      >
-                        {['Upcoming', 'Visited', 'FollowUp', 'Revisited', 'Booked', 'Closed'].map((st) => (
-                          <option key={st} value={st}>{st}</option>
-                        ))}
-                      </select>
+                      {!isAdmin && (
+                        <select
+                          className="status-dropdown"
+                          value={v.status || 'Upcoming'}
+                          onChange={(e) => handleStatusChange(v.id, e.target.value)}
+                          style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: '600', color: '#075c4d' }}
+                          title="Update visit status in MySQL"
+                        >
+                          {['Upcoming', 'Visited', 'FollowUp', 'Revisited', 'Booked', 'Closed'].map((st) => (
+                            <option key={st} value={st}>{st}</option>
+                          ))}
+                        </select>
+                      )}
                     </div>
                   </div>
 
