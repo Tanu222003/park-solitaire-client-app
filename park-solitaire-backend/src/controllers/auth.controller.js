@@ -52,11 +52,21 @@ export async function login(req, res, next) {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+    const cleanIdentifier = String(email).trim();
+    // Allow login by email OR mobile phone / alternate phone
+    let [rows] = await pool.query(
+      'SELECT * FROM users WHERE email = ? OR phone = ? OR phone2 = ? OR REPLACE(phone, " ", "") = ? OR REPLACE(phone, "+91", "") = ?',
+      [cleanIdentifier, cleanIdentifier, cleanIdentifier, cleanIdentifier.replace(/\s+/g, ''), cleanIdentifier.replace(/^\+91/, '').trim()]
+    );
+
+    if (rows.length === 0 && cleanIdentifier.toLowerCase() === 'admin') {
+      [rows] = await pool.query("SELECT * FROM users WHERE email = 'admin@parksolitaire.com'");
+    }
+
     const user = rows[0];
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
-      return res.status(401).json({ message: 'Invalid email or password' });
+      return res.status(401).json({ message: 'Invalid email/mobile or password' });
     }
 
     if (user.status === 'inactive') {

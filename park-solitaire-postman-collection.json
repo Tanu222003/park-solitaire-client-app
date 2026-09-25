@@ -589,6 +589,103 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "8. Admin Management & Operations",
+      "item": [
+        {
+          "name": "Admin Dashboard Analytics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/dashboard",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "dashboard"]
+            },
+            "description": "Returns counts, metrics, client pipeline stages, and total payment approval amounts."
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Channel Partners",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/partners",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "partners"]
+            },
+            "description": "Lists all registered Channel Partners with contact details and status."
+          },
+          "response": []
+        },
+        {
+          "name": "Register New Partner (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Suresh Patel\",\n  \"firm_name\": \"Patel Realties\",\n  \"email\": \"suresh.patel@example.com\",\n  \"password\": \"partner123\",\n  \"phone\": \"+91 98111 22233\",\n  \"phone2\": \"+91 98111 44455\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/partners",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "partners"]
+            },
+            "description": "Admin creates a Channel Partner account directly."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Partner Status (Active / Inactive)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/partners/4/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "partners", "4", "status"]
+            },
+            "description": "Admin activates or deactivates a Channel Partner account (status: active or inactive)."
+          },
+          "response": []
+        }
+      ]
     }
   ]
 }

@@ -765,13 +765,18 @@ function handleMockRequest(endpoint, options = {}) {
 }
 
 // -------------------------------------------------------------
-// Core Request Handler (Live with Transparent Demo Fallback)
+// Core Request Handler (Strict Cloud Backend with Real Error Handling)
 // -------------------------------------------------------------
 async function request(endpoint, options = {}) {
-  const token = localStorage.getItem("token");
+  let token = localStorage.getItem("token");
+  if (token && token.startsWith("demo-jwt-token-")) {
+    console.warn("Removing legacy mock demo token to enforce live cloud API authentication");
+    localStorage.removeItem("token");
+    token = null;
+  }
   const baseUrl = getBaseUrl();
 
-  // If no base URL is defined (e.g. on Vercel / GitHub Pages with no cloud backend):
+  // If no base URL is defined (e.g. offline static preview without cloud backend):
   if (!baseUrl) {
     return handleMockRequest(endpoint, options);
   }
@@ -786,19 +791,29 @@ async function request(endpoint, options = {}) {
       }
     });
 
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      data = {};
+    }
 
     if (!response.ok) {
-      throw new Error(data.message || "Request failed");
+      if (response.status === 401 && !endpoint.includes("/auth/login")) {
+        console.warn("Session token expired or invalid (401). Clearing token.");
+        localStorage.removeItem("token");
+      }
+      const error = new Error(data.message || `Request failed with status ${response.status}`);
+      error.status = response.status;
+      error.data = data;
+      throw error;
     }
 
     return data;
   } catch (err) {
-    // If live fetch fails (Failed to fetch, Mixed Content, Network Timeout):
-    console.warn(`API ${endpoint} failed against ${baseUrl}. Using resilient Demo Store fallback:`, err.message);
-
-    // If it's a login attempt or data fetch, fall back smoothly
-    return handleMockRequest(endpoint, options);
+    // Log failure and propagate genuine error without silently diverting to localStorage mock store
+    console.warn(`API ${endpoint} failed against ${baseUrl}:`, err.message);
+    throw err;
   }
 }
 
