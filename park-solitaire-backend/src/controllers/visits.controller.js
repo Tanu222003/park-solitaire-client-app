@@ -124,19 +124,27 @@ export async function createVisit(req, res, next) {
     const partnerId = req.user.role === 'admin' ? clients[0].partner_id : req.user.id;
 
     // If visit already exists for this client, update it instead of adding multiple times
-    const [existingVisits] = await pool.query('SELECT id, notes FROM visits WHERE client_id = ? ORDER BY id DESC LIMIT 1', [client_id]);
+    const [existingVisits] = await pool.query('SELECT id, notes, status FROM visits WHERE client_id = ? ORDER BY id DESC LIMIT 1', [client_id]);
     let visitId;
     if (existingVisits.length > 0) {
       visitId = existingVisits[0].id;
+      const curClean = String(existingVisits[0].status || '').toLowerCase().replace(/[\s-_]/g, '');
+      const targetClean = status ? String(status).toLowerCase().replace(/[\s-_]/g, '') : curClean;
+      if (['booked', 'closed'].includes(curClean) && status && targetClean !== curClean) {
+        return res.status(400).json({
+          message: `Client visit is already marked as "${existingVisits[0].status}". Once Booked or Closed, status cannot be changed.`
+        });
+      }
+      const finalStatus = ['booked', 'closed'].includes(curClean) ? existingVisits[0].status : (status || existingVisits[0].status || 'Upcoming');
       const combinedNotes = notes ? (existingVisits[0].notes ? `${existingVisits[0].notes} | ${notes}` : notes) : existingVisits[0].notes;
       await pool.query(
         'UPDATE visits SET visit_date = ?, visit_time = ?, notes = ?, status = ? WHERE id = ?',
-        [visit_date, visit_time || '11:00 AM', combinedNotes || null, status || 'Upcoming', visitId]
+        [visit_date, visit_time || '11:00 AM', combinedNotes || null, finalStatus, visitId]
       );
     } else {
       const [result] = await pool.query(
         'INSERT INTO visits (client_id, client_name, partner_id, visit_date, visit_time, notes, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [client_id, clientRows[0].name, partnerId, visit_date, visit_time || null, notes || null, status || 'Upcoming']
+        [client_id, clients[0].name, partnerId, visit_date, visit_time || null, notes || null, status || 'Upcoming']
       );
       visitId = result.insertId;
     }
@@ -187,6 +195,15 @@ export async function updateVisit(req, res, next) {
     }
 
     if (status) {
+      const curClean = String(existing[0].status || '').toLowerCase().replace(/[\s-_]/g, '');
+      const targetClean = String(status).toLowerCase().replace(/[\s-_]/g, '');
+
+      if (['booked', 'closed'].includes(curClean) && targetClean !== curClean) {
+        return res.status(400).json({
+          message: `Visit is already "${existing[0].status}". Once marked as Booked or Closed, no further status change is permitted.`
+        });
+      }
+
       const currentWeight = getStageWeight(existing[0].status);
       const targetWeight = getStageWeight(status);
       if (targetWeight < currentWeight) {

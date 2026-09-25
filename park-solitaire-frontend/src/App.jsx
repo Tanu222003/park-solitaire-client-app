@@ -1095,6 +1095,12 @@ function getVisitDayClassification(visitDate) {
 
 const VISIT_STAGES_FLOW = ['Upcoming', 'Visited', 'FollowUp', 'Revisited', 'Booked', 'Closed'];
 
+function isVisitStatusLocked(status) {
+  if (!status) return false;
+  const clean = String(status).toLowerCase().replace(/[\s-_]/g, '');
+  return clean === 'booked' || clean === 'closed';
+}
+
 function getStageWeight(st) {
   if (!st) return 0;
   const clean = String(st).toLowerCase().replace(/[\s-_]/g, '');
@@ -1108,6 +1114,9 @@ function getStageWeight(st) {
 }
 
 function getForwardStages(currentStatus) {
+  if (isVisitStatusLocked(currentStatus)) {
+    return [currentStatus];
+  }
   const currentWeight = getStageWeight(currentStatus);
   return VISIT_STAGES_FLOW.filter((st) => getStageWeight(st) >= currentWeight);
 }
@@ -1245,10 +1254,10 @@ function ClientVisitsWidget({
 
                   <div className="visit-status-controls">
                     <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
-                      {v.status || 'Upcoming'}
+                      {isVisitStatusLocked(v.status) ? '🔒 ' : ''}{v.status || 'Upcoming'}
                     </span>
 
-                    {onUpdateStatus && (
+                    {onUpdateStatus && !isVisitStatusLocked(v.status) && (
                       <select
                         className="status-dropdown"
                         value={v.status || 'Upcoming'}
@@ -1427,6 +1436,10 @@ function Dashboard({ admin = false }) {
     try {
       const currentVisit = visits.find((v) => Number(v.id) === Number(visitId));
       if (currentVisit) {
+        if (isVisitStatusLocked(currentVisit.status)) {
+          alert(`Status is already marked as "${currentVisit.status}". Once Booked or Closed, no further status changes are permitted.`);
+          return;
+        }
         const curW = getStageWeight(currentVisit.status);
         const tgtW = getStageWeight(newStatus);
         if (tgtW < curW) {
@@ -2353,6 +2366,7 @@ function ClientVisitJourneyChart({
   }
 
   const currentStageObj = STAGES[currentStageIndex];
+  const isCurrentLocked = isVisitStatusLocked(currentStageObj.key);
   const progressPercent = Math.round(((currentStageIndex + 1) / STAGES.length) * 100);
 
   const visitsByStage = {};
@@ -2384,7 +2398,7 @@ function ClientVisitJourneyChart({
                 {client?.name || 'Client Visit Details'}
               </h3>
               <span className={`visit-status-pill status-${currentStageObj.key.toLowerCase()}`}>
-                ● {currentStageObj.title}
+                {isCurrentLocked ? '🔒 ' : '● '}{currentStageObj.title}
               </span>
             </div>
             <div style={{ color: '#6b7c77', fontSize: '12px', marginTop: '3px' }}>
@@ -2403,6 +2417,26 @@ function ClientVisitJourneyChart({
           <div className="progress-percentage-pill">{progressPercent}% Journey Progress</div>
         </div>
       </div>
+
+      {/* Finalized Banner if Booked or Closed */}
+      {isCurrentLocked && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '10px 14px',
+          margin: '12px 0 6px 0',
+          borderRadius: '8px',
+          background: '#ecfdf5',
+          border: '1px solid #a7f3d0',
+          color: '#065f46',
+          fontSize: '13px',
+          fontWeight: '600'
+        }}>
+          <Lock size={15} />
+          <span>Visit Finalized: Status is marked as <strong>{currentStageObj.title}</strong>. No further status changes can be made.</span>
+        </div>
+      )}
 
       {/* Progress Track */}
       <div className="journey-progress-bar-track">
@@ -2427,6 +2461,10 @@ function ClientVisitJourneyChart({
                 className={`journey-step-node ${isCompleted ? 'step-completed' : ''} ${isCurrent ? 'step-current' : ''} ${isPending ? 'step-pending' : ''}`}
                 onClick={() => {
                   if (visits.length > 0 && onUpdateStatus) {
+                    if (isCurrentLocked) {
+                      alert(`Status is already finalized as "${currentStageObj.title}". Once a visit is Booked or Closed, no further status changes are permitted.`);
+                      return;
+                    }
                     if (idx < currentStageIndex) {
                       alert(`Cannot revert visit status backwards in the flow from "${currentStageObj.title}" to "${st.title}". Progression is strictly forward.`);
                       return;
@@ -2435,13 +2473,17 @@ function ClientVisitJourneyChart({
                   }
                 }}
                 style={{
-                  cursor: visits.length > 0 && onUpdateStatus ? (idx < currentStageIndex ? 'not-allowed' : 'pointer') : 'default',
-                  opacity: idx < currentStageIndex ? 0.8 : 1
+                  cursor: visits.length > 0 && onUpdateStatus
+                    ? (isCurrentLocked || idx < currentStageIndex ? 'not-allowed' : 'pointer')
+                    : 'default',
+                  opacity: isCurrentLocked && !isCurrent ? 0.6 : (idx < currentStageIndex ? 0.8 : 1)
                 }}
                 title={
-                  idx < currentStageIndex
-                    ? `Stage "${st.title}" is already completed (flow is strictly forward-only)`
-                    : `Click to update client visit stage to "${st.title}" in MySQL`
+                  isCurrentLocked
+                    ? `Status is finalized as "${currentStageObj.title}" (locked - no further changes permitted)`
+                    : (idx < currentStageIndex
+                        ? `Stage "${st.title}" is already completed (flow is strictly forward-only)`
+                        : `Click to update client visit stage to "${st.title}" in MySQL`)
                 }
               >
                 {idx < STAGES.length - 1 && (
@@ -2509,7 +2551,7 @@ function ClientVisitJourneyChart({
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <small style={{ fontSize: '10px', color: '#6b7c77', fontWeight: '600' }}>STATUS:</small>
                           <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
-                            {v.status || 'Upcoming'}
+                            {isVisitStatusLocked(v.status) ? '🔒 ' : ''}{v.status || 'Upcoming'}
                           </span>
                         </div>
                       </div>
@@ -2569,6 +2611,10 @@ function Details() {
     try {
       const currentVisit = client?.visits?.find((v) => Number(v.id) === Number(visitId));
       if (currentVisit) {
+        if (isVisitStatusLocked(currentVisit.status)) {
+          alert(`Status is already marked as "${currentVisit.status}". Once Booked or Closed, no further status changes are permitted.`);
+          return;
+        }
         const curW = getStageWeight(currentVisit.status);
         const tgtW = getStageWeight(newStatus);
         if (tgtW < curW) {
@@ -2797,19 +2843,21 @@ function Details() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <small style={{ fontSize: '10px', color: '#6b7c77', fontWeight: '600' }}>STATUS:</small>
                         <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
-                          {v.status || 'Upcoming'}
+                          {isVisitStatusLocked(v.status) ? '🔒 ' : ''}{v.status || 'Upcoming'}
                         </span>
-                        <select
-                          className="status-dropdown"
-                          value={v.status || 'Upcoming'}
-                          onChange={(e) => handleVisitStatusChange(v.id, e.target.value)}
-                          style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: '600', color: '#075c4d' }}
-                          title="Update visit status in MySQL"
-                        >
-                          {getForwardStages(v.status).map((st) => (
-                            <option key={st} value={st}>{st}</option>
-                          ))}
-                        </select>
+                        {!isVisitStatusLocked(v.status) && (
+                          <select
+                            className="status-dropdown"
+                            value={v.status || 'Upcoming'}
+                            onChange={(e) => handleVisitStatusChange(v.id, e.target.value)}
+                            style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: '600', color: '#075c4d' }}
+                            title="Update visit status in MySQL"
+                          >
+                            {getForwardStages(v.status).map((st) => (
+                              <option key={st} value={st}>{st}</option>
+                            ))}
+                          </select>
+                        )}
                       </div>
                     </div>
                     <b style={{ fontSize: '14px', marginTop: '4px', display: 'inline-block' }}>Site Visit — {v.status || 'Upcoming'}</b>
@@ -3098,13 +3146,18 @@ function Visits() {
       alert('Please select a visit date.');
       return;
     }
+
+    const existingClientVisit = visits.find((v) => Number(v.client_id) === Number(newVisit.client_id));
+    const isLocked = existingClientVisit && isVisitStatusLocked(existingClientVisit.status);
+    const visitStatusToSave = isLocked ? existingClientVisit.status : (newVisit.status || 'Upcoming');
+
     try {
       await api.createVisit({
         client_id: Number(newVisit.client_id),
         visit_date: newVisit.visit_date,
         visit_time: newVisit.visit_time || '11:00 AM',
         notes: newVisit.notes || '',
-        status: newVisit.status || 'Upcoming'
+        status: visitStatusToSave
       });
       setShowModal(false);
       setToast('Visit scheduled & saved to MySQL!');
@@ -3120,6 +3173,10 @@ function Visits() {
     try {
       const currentVisit = visits.find((v) => Number(v.id) === Number(visitId));
       if (currentVisit) {
+        if (isVisitStatusLocked(currentVisit.status)) {
+          alert(`Status is already marked as "${currentVisit.status}". Once Booked or Closed, no further status changes are permitted.`);
+          return;
+        }
         const curW = getStageWeight(currentVisit.status);
         const tgtW = getStageWeight(newStatus);
         if (tgtW < curW) {
@@ -3263,7 +3320,7 @@ function Visits() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <small style={{ fontSize: '10px', color: '#6b7c77', fontWeight: '600' }}>STATUS:</small>
                       <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
-                        {v.status || 'Upcoming'}
+                        {isVisitStatusLocked(v.status) ? '🔒 ' : ''}{v.status || 'Upcoming'}
                       </span>
                     </div>
                   </div>
@@ -3366,17 +3423,43 @@ function Visits() {
                   <label>Select Client *</label>
                   <select
                     value={newVisit.client_id}
-                    onChange={(e) => setNewVisit({ ...newVisit, client_id: e.target.value })}
+                    onChange={(e) => {
+                      const cId = e.target.value;
+                      const ex = visits.find((v) => Number(v.client_id) === Number(cId));
+                      const isLocked = ex && isVisitStatusLocked(ex.status);
+                      setNewVisit({
+                        ...newVisit,
+                        client_id: cId,
+                        status: isLocked ? ex.status : (newVisit.status || 'Upcoming')
+                      });
+                    }}
                   >
-                    {clients.map((c) => (
-                      <option key={c.id} value={String(c.id)}>{c.name} ({c.phone || 'No phone'})</option>
-                    ))}
+                    {clients.map((c) => {
+                      const ex = visits.find((v) => Number(v.client_id) === Number(c.id));
+                      const lockedTag = ex && isVisitStatusLocked(ex.status) ? ` — 🔒 ${ex.status}` : '';
+                      return (
+                        <option key={c.id} value={String(c.id)}>
+                          {c.name} ({c.phone || 'No phone'}){lockedTag}
+                        </option>
+                      );
+                    })}
                   </select>
                   {clients.length === 0 && (
                     <p style={{ color: '#d97706', fontSize: '12px', margin: '4px 0 0' }}>
                       ⚠️ No clients registered yet. Please add a client first.
                     </p>
                   )}
+                  {(() => {
+                    const ex = visits.find((v) => Number(v.client_id) === Number(newVisit.client_id));
+                    if (ex && isVisitStatusLocked(ex.status)) {
+                      return (
+                        <div style={{ color: '#065f46', background: '#ecfdf5', padding: '6px 10px', borderRadius: '6px', fontSize: '12px', marginTop: '6px', border: '1px solid #a7f3d0' }}>
+                          🔒 Client visit is already marked as <strong>{ex.status}</strong>. Status is finalized and cannot be changed.
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
 
                 <div className="form-grid-2" style={{ marginBottom: '12px' }}>
@@ -3435,17 +3518,26 @@ function Visits() {
 
                 <div className="form-field" style={{ marginBottom: '12px' }}>
                   <label>Visit Status</label>
-                  <select
-                    value={newVisit.status}
-                    onChange={(e) => setNewVisit({ ...newVisit, status: e.target.value })}
-                  >
-                    <option value="Upcoming">Upcoming</option>
-                    <option value="Visited">Visited</option>
-                    <option value="FollowUp">FollowUp</option>
-                    <option value="Revisited">Revisited</option>
-                    <option value="Booked">Booked</option>
-                    <option value="Closed">Closed</option>
-                  </select>
+                  {(() => {
+                    const ex = visits.find((v) => Number(v.client_id) === Number(newVisit.client_id));
+                    const isLocked = ex && isVisitStatusLocked(ex.status);
+                    return (
+                      <select
+                        value={isLocked ? ex.status : newVisit.status}
+                        disabled={isLocked}
+                        onChange={(e) => setNewVisit({ ...newVisit, status: e.target.value })}
+                        style={isLocked ? { background: '#f3f4f6', cursor: 'not-allowed', color: '#6b7280' } : {}}
+                      >
+                        {isLocked ? (
+                          <option value={ex.status}>{ex.status} (Finalized - Locked)</option>
+                        ) : (
+                          ['Upcoming', 'Visited', 'FollowUp', 'Revisited', 'Booked', 'Closed'].map((st) => (
+                            <option key={st} value={st}>{st}</option>
+                          ))
+                        )}
+                      </select>
+                    );
+                  })()}
                 </div>
 
                 <div className="form-field">
