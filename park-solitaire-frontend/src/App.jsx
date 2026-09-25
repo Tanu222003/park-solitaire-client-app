@@ -2511,19 +2511,6 @@ function ClientVisitJourneyChart({
                           <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
                             {v.status || 'Upcoming'}
                           </span>
-                          {!isAdmin && onUpdateStatus && (
-                            <select
-                              className="status-dropdown"
-                              value={v.status || 'Upcoming'}
-                              onChange={(e) => onUpdateStatus(v.id, e.target.value)}
-                              style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: '600', color: '#075c4d' }}
-                              title="Update visit status in MySQL"
-                            >
-                              {getForwardStages(v.status).map((st) => (
-                                <option key={st} value={st}>{st}</option>
-                              ))}
-                            </select>
-                          )}
                         </div>
                       </div>
 
@@ -3278,19 +3265,6 @@ function Visits() {
                       <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
                         {v.status || 'Upcoming'}
                       </span>
-                      {!isAdmin && (
-                        <select
-                          className="status-dropdown"
-                          value={v.status || 'Upcoming'}
-                          onChange={(e) => handleStatusChange(v.id, e.target.value)}
-                          style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: '600', color: '#075c4d' }}
-                          title="Update visit status in MySQL"
-                        >
-                          {getForwardStages(v.status).map((st) => (
-                            <option key={st} value={st}>{st}</option>
-                          ))}
-                        </select>
-                      )}
                     </div>
                   </div>
 
