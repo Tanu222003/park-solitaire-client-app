@@ -1222,12 +1222,12 @@ function ClientVisitsWidget({
                       {v.status || 'Upcoming'}
                     </span>
 
-                    {admin && (
+                    {onUpdateStatus && (
                       <select
                         className="status-dropdown"
                         value={v.status || 'Upcoming'}
                         onChange={(e) => onUpdateStatus(v.id, e.target.value)}
-                        style={{ fontSize: '11px', padding: '2px 6px' }}
+                        style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: '600', color: '#075c4d' }}
                         title="Update visit status in MySQL"
                       >
                         {['Upcoming', 'Visited', 'FollowUp', 'Revisited', 'Booked', 'Closed'].map((st) => (
@@ -2380,12 +2380,12 @@ function ClientVisitJourneyChart({
                 key={st.key}
                 className={`journey-step-node ${isCompleted ? 'step-completed' : ''} ${isCurrent ? 'step-current' : ''} ${isPending ? 'step-pending' : ''}`}
                 onClick={() => {
-                  if (isAdmin && visits.length > 0 && onUpdateStatus) {
+                  if (visits.length > 0 && onUpdateStatus) {
                     onUpdateStatus(visits[0].id, st.key);
                   }
                 }}
-                style={{ cursor: isAdmin && visits.length > 0 ? 'pointer' : 'default' }}
-                title={isAdmin ? `Click to advance client visit stage to ${st.title}` : st.title}
+                style={{ cursor: visits.length > 0 && onUpdateStatus ? 'pointer' : 'default' }}
+                title={`Click to update client visit stage to "${st.title}" in MySQL`}
               >
                 {idx < STAGES.length - 1 && (
                   <div className={`step-connector ${idx < currentStageIndex ? 'connector-done' : ''}`} />
@@ -2450,6 +2450,19 @@ function ClientVisitJourneyChart({
                           <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
                             {v.status || 'Upcoming'}
                           </span>
+                          {onUpdateStatus && (
+                            <select
+                              className="status-dropdown"
+                              value={v.status || 'Upcoming'}
+                              onChange={(e) => onUpdateStatus(v.id, e.target.value)}
+                              style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: '600', color: '#075c4d' }}
+                              title="Update visit status in MySQL"
+                            >
+                              {['Upcoming', 'Visited', 'FollowUp', 'Revisited', 'Booked', 'Closed'].map((st) => (
+                                <option key={st} value={st}>{st}</option>
+                              ))}
+                            </select>
+                          )}
                         </div>
                       </div>
 
@@ -2710,6 +2723,17 @@ function Details() {
                         <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
                           {v.status || 'Upcoming'}
                         </span>
+                        <select
+                          className="status-dropdown"
+                          value={v.status || 'Upcoming'}
+                          onChange={(e) => handleVisitStatusChange(v.id, e.target.value)}
+                          style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: '600', color: '#075c4d' }}
+                          title="Update visit status in MySQL"
+                        >
+                          {['Upcoming', 'Visited', 'FollowUp', 'Revisited', 'Booked', 'Closed'].map((st) => (
+                            <option key={st} value={st}>{st}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                     <b style={{ fontSize: '14px', marginTop: '4px', display: 'inline-block' }}>Site Visit — {v.status || 'Upcoming'}</b>
@@ -3138,6 +3162,17 @@ function Visits() {
                       <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
                         {v.status || 'Upcoming'}
                       </span>
+                      <select
+                        className="status-dropdown"
+                        value={v.status || 'Upcoming'}
+                        onChange={(e) => handleStatusChange(v.id, e.target.value)}
+                        style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: '600', color: '#075c4d' }}
+                        title="Update visit status in MySQL"
+                      >
+                        {['Upcoming', 'Visited', 'FollowUp', 'Revisited', 'Booked', 'Closed'].map((st) => (
+                          <option key={st} value={st}>{st}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
