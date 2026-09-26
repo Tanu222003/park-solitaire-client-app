@@ -2561,8 +2561,11 @@ input:focus, select:focus, textarea:focus {
   }
 
   .app-header {
+    position: relative !important;
+    top: auto !important;
     height: calc(60px + env(safe-area-inset-top, 0px));
     padding: env(safe-area-inset-top, 0px) 20px 0 20px;
+    box-shadow: none;
   }
 
   .app-main-content {
@@ -2579,7 +2582,7 @@ input:focus, select:focus, textarea:focus {
     gap: 12px;
   }
 
-  /* Fixed Mobile Bottom Bar */
+  /* Fixed Mobile Bottom Bar - smoothly hides on scroll down to prevent floating clutter */
   .nav-mobile-bottom-bar {
     display: flex;
     position: fixed;
@@ -2595,6 +2598,13 @@ input:focus, select:focus, textarea:focus {
     align-items: center;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06);
     padding-bottom: env(safe-area-inset-bottom, 0px);
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+  }
+
+  .nav-mobile-bottom-bar.hidden-on-scroll {
+    transform: translateY(calc(100% + 20px));
+    opacity: 0;
+    pointer-events: none;
   }
 
   .nav-mobile-btn {

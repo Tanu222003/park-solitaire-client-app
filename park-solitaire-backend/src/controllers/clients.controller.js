@@ -67,12 +67,20 @@ export async function createClient(req, res, next) {
 
     if (!name) return res.status(400).json({ message: 'name is required' });
 
+    let cleanPhone = null;
+    if (phone) {
+      cleanPhone = String(phone).replace(/\D/g, '');
+      if (cleanPhone.length !== 10) {
+        return res.status(400).json({ message: 'Phone number must be exactly 10 digits.' });
+      }
+    }
+
     // Pipeline status defaults to 'Upcoming Visit'
     const clientStatus = status || 'Upcoming Visit';
 
     const [result] = await pool.query(
       'INSERT INTO clients (partner_id, name, phone, email, address, unit_type, budget, source, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [req.user.id, name, phone || null, email || null, address || null, unit_type || null, budget || null, source || null, clientStatus]
+      [req.user.id, name, cleanPhone || phone || null, email || null, address || null, unit_type || null, budget || null, source || null, clientStatus]
     );
 
     const clientId = result.insertId;
@@ -155,6 +163,14 @@ export async function updateClient(req, res, next) {
       return res.status(403).json({ message: 'Not your client' });
     }
 
+    let cleanPhone = undefined;
+    if (phone !== undefined && phone !== null && phone !== '') {
+      cleanPhone = String(phone).replace(/\D/g, '');
+      if (cleanPhone.length !== 10) {
+        return res.status(400).json({ message: 'Phone number must be exactly 10 digits.' });
+      }
+    }
+
     await pool.query(
       `UPDATE clients SET
          name       = COALESCE(?, name),
@@ -166,7 +182,7 @@ export async function updateClient(req, res, next) {
          source     = COALESCE(?, source),
          status     = COALESCE(?, status)
        WHERE id = ?`,
-      [name ?? null, phone ?? null, email ?? null, address ?? null, unit_type ?? null, budget ?? null, source ?? null, status ?? null, req.params.id]
+      [name ?? null, cleanPhone ?? phone ?? null, email ?? null, address ?? null, unit_type ?? null, budget ?? null, source ?? null, status ?? null, req.params.id]
     );
 
     const [rows] = await pool.query(`

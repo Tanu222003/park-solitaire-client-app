@@ -23,10 +23,26 @@ export async function register(req, res, next) {
       return res.status(409).json({ message: 'An account with this email already exists' });
     }
 
+    let cleanPhone = null;
+    if (phone) {
+      cleanPhone = String(phone).replace(/\D/g, '');
+      if (cleanPhone.length !== 10) {
+        return res.status(400).json({ message: 'Contact number must be exactly 10 digits.' });
+      }
+    }
+
+    let cleanPhone2 = null;
+    if (phone2) {
+      cleanPhone2 = String(phone2).replace(/\D/g, '');
+      if (cleanPhone2.length !== 10) {
+        return res.status(400).json({ message: 'Alternate phone number must be exactly 10 digits.' });
+      }
+    }
+
     const hashed = await bcrypt.hash(password, 10);
     const [result] = await pool.query(
       'INSERT INTO users (name, firm_name, contact_name, email, password, phone, phone2, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [name, firm_name || null, contact_name || null, email, hashed, phone || null, phone2 || null, 'partner']
+      [name, firm_name || null, contact_name || null, email, hashed, cleanPhone || null, cleanPhone2 || null, 'partner']
     );
 
     const user = {
@@ -35,8 +51,8 @@ export async function register(req, res, next) {
       firm_name: firm_name || null,
       email,
       role: 'partner',
-      phone: phone || null,
-      phone2: phone2 || null
+      phone: cleanPhone || null,
+      phone2: cleanPhone2 || null
     };
     res.status(201).json({ token: signToken(user), user });
   } catch (err) {

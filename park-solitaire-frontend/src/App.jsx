@@ -540,9 +540,27 @@ function Register() {
       return;
     }
 
+    const cleanPhone = (form.phone || '').replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      setError('Contact number must be exactly 10 digits.');
+      return;
+    }
+
+    if (form.phone2 && form.phone2.trim()) {
+      const cleanPhone2 = form.phone2.replace(/\D/g, '');
+      if (cleanPhone2.length !== 10) {
+        setError('Alternate number must be exactly 10 digits.');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
-      const res = await api.register(form);
+      const res = await api.register({
+        ...form,
+        phone: cleanPhone,
+        phone2: form.phone2 && form.phone2.trim() ? form.phone2.replace(/\D/g, '') : null
+      });
       localStorage.setItem('token', res.token);
       localStorage.setItem('user', JSON.stringify(res.user));
       navigate('/partner/dashboard');
@@ -595,17 +613,21 @@ function Register() {
         <input
           type="tel"
           required
+          maxLength={10}
+          pattern="[0-9]{10}"
           value={form.phone}
-          onChange={(e) => setForm({ ...form, phone: e.target.value })}
-          placeholder="Enter contact number"
+          onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+          placeholder="10-digit contact number"
         />
 
         <label>Alternate number <span style={{ fontWeight: 400, color: '#6b7280', fontSize: '11.5px' }}>(Optional)</span></label>
         <input
           type="tel"
+          maxLength={10}
+          pattern="[0-9]{10}"
           value={form.phone2}
-          onChange={(e) => setForm({ ...form, phone2: e.target.value })}
-          placeholder="Enter alternate number"
+          onChange={(e) => setForm({ ...form, phone2: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+          placeholder="10-digit alternate number"
         />
 
         <label>Create Password *</label>
@@ -779,7 +801,7 @@ function NavDesktop({ role = 'partner' }) {
   );
 }
 
-function NavMobile({ role = 'partner', onOpenMore }) {
+function NavMobile({ role = 'partner', onOpenMore, hidden = false }) {
   const l = useLocation();
   const prefix = role === 'admin' ? '/admin' : '/partner';
   const items = [
@@ -796,7 +818,7 @@ function NavMobile({ role = 'partner', onOpenMore }) {
   }
 
   return (
-    <nav className="nav-mobile-bottom-bar">
+    <nav className={`nav-mobile-bottom-bar ${hidden ? 'hidden-on-scroll' : ''}`}>
       {items.map(({ path, label, icon: Icon }) => {
         const isSel = l.pathname === path || (path !== `${prefix}/dashboard` && l.pathname.startsWith(path));
         return (
@@ -828,6 +850,7 @@ function Shell({ children }) {
   const location = useLocation();
   const { openUserDetails } = useUserModal();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [scrollDir, setScrollDir] = useState('up');
   const [toasts, setToasts] = useState([]);
   const userStr = localStorage.getItem('user');
   let user = { name: 'User', role: 'partner', email: '' };
@@ -864,6 +887,28 @@ function Shell({ children }) {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  useEffect(() => {
+    let lastY = window.scrollY;
+    let ticking = false;
+
+    const onScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const currentY = window.scrollY;
+          if (Math.abs(currentY - lastY) > 8) {
+            setScrollDir(currentY > lastY && currentY > 40 ? 'down' : 'up');
+            lastY = currentY > 0 ? currentY : 0;
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   // Real-Time Server-Sent Events (SSE) stream listener + cross-tab storage sync
@@ -1016,8 +1061,8 @@ function Shell({ children }) {
         {children}
       </main>
 
-      {/* Mobile Fixed Bottom Navigation */}
-      <NavMobile role={user.role} onOpenMore={() => setDrawerOpen(true)} />
+      {/* Mobile Fixed Bottom Navigation - hides when scrolling down */}
+      <NavMobile role={user.role} onOpenMore={() => setDrawerOpen(true)} hidden={scrollDir === 'down'} />
     </div>
   );
 }
@@ -1520,7 +1565,7 @@ function Dashboard({ admin = false }) {
         status: newVisit.status || 'Upcoming'
       });
       setShowScheduleModal(false);
-      setToast('Visit successfully scheduled & saved to MySQL!');
+      setToast('Visit successfully scheduled & saved!');
       setTimeout(() => setToast(''), 4000);
       loadDashboardData();
       window.dispatchEvent(new CustomEvent('portal-refresh'));
@@ -1694,7 +1739,7 @@ function Dashboard({ admin = false }) {
                   Cancel
                 </button>
                 <button type="submit" className="btn-save" disabled={scheduleSubmitting}>
-                  <Check size={16} /> {scheduleSubmitting ? 'Scheduling...' : 'Save Visit to MySQL'}
+                  <Check size={16} /> {scheduleSubmitting ? 'Saving...' : 'Save'}
                 </button>
               </div>
             </form>
@@ -1969,8 +2014,18 @@ function Clients() {
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!newClient.name.trim()) return;
+
+    const cleanPhone = (newClient.phone || '').replace(/\D/g, '');
+    if (newClient.phone && cleanPhone.length !== 10) {
+      alert('Client phone number must be exactly 10 digits.');
+      return;
+    }
+
     try {
-      await api.createClient(newClient);
+      await api.createClient({
+        ...newClient,
+        phone: cleanPhone || newClient.phone
+      });
       setShowModal(false);
       setNewClient(initialClientForm);
       loadClients();
@@ -2115,9 +2170,12 @@ function Clients() {
                   <div className="form-field">
                     <label>Mobile Number</label>
                     <input
+                      type="tel"
+                      maxLength={10}
+                      pattern="[0-9]{10}"
                       value={newClient.phone}
-                      onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })}
-                      placeholder="+91 98765 43210"
+                      onChange={(e) => setNewClient({ ...newClient, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                      placeholder="10-digit mobile number"
                     />
                   </div>
 
@@ -2315,7 +2373,7 @@ function Clients() {
                   Cancel
                 </button>
                 <button type="submit" className="btn-save">
-                  <Check size={16} /> Save Client to MySQL
+                  <Check size={16} /> Save
                 </button>
               </div>
             </form>
@@ -2637,7 +2695,7 @@ function Details() {
       });
 
       await api.updateVisit(visitId, { status: newStatus });
-      setToast(`Visit status updated to "${newStatus}" in MySQL!`);
+      setToast(`Visit status updated to "${newStatus}"!`);
       setTimeout(() => setToast(''), 4000);
       loadClient();
       window.dispatchEvent(new CustomEvent('portal-refresh'));
@@ -2670,7 +2728,7 @@ function Details() {
     try {
       const updated = await api.updateClient(client.id, { status: newStatus });
       setClient((prev) => ({ ...prev, status: updated.status, updated_at: updated.updated_at }));
-      setToast(`Client status changed to "${newStatus}" in MySQL!`);
+      setToast(`Client status changed to "${newStatus}"!`);
       setTimeout(() => setToast(''), 4000);
     } catch (err) {
       alert(err.message || 'Failed to update client status');
@@ -2679,10 +2737,15 @@ function Details() {
 
   const handleSaveEdit = async (e) => {
     e.preventDefault();
+    const cleanPhone = (editData.phone || '').replace(/\D/g, '');
+    if (editData.phone && cleanPhone.length !== 10) {
+      alert('Client mobile number must be exactly 10 digits.');
+      return;
+    }
     try {
       const updated = await api.updateClient(client.id, {
         name: editData.name,
-        phone: editData.phone,
+        phone: cleanPhone || editData.phone,
         email: editData.email,
         unit_type: editData.unit_type,
         budget: editData.budget,
@@ -2692,7 +2755,7 @@ function Details() {
       });
       setClient((prev) => ({ ...prev, ...updated }));
       setShowEditModal(false);
-      setToast('Client details updated successfully in MySQL!');
+      setToast('Client details updated successfully!');
       setTimeout(() => setToast(''), 4000);
     } catch (err) {
       alert(err.message || 'Failed to update client details');
@@ -2708,7 +2771,7 @@ function Details() {
         admin_reply: replyText
       });
       setShowReplyModal(false);
-      setToast('Complaint response & status saved to MySQL!');
+      setToast('Complaint response & status saved!');
       setTimeout(() => setToast(''), 4000);
       loadClient();
     } catch (err) {
@@ -2958,8 +3021,12 @@ function Details() {
                   <div className="form-field">
                     <label>Mobile Number</label>
                     <input
+                      type="tel"
+                      maxLength={10}
+                      pattern="[0-9]{10}"
                       value={editData.phone || ''}
-                      onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
+                      onChange={(e) => setEditData({ ...editData, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                      placeholder="10-digit mobile number"
                     />
                   </div>
 
@@ -3019,7 +3086,7 @@ function Details() {
                   Cancel
                 </button>
                 <button type="submit" className="btn-save">
-                  <Check size={16} /> Save Changes to MySQL
+                  <Check size={16} /> Save
                 </button>
               </div>
             </form>
@@ -3064,7 +3131,7 @@ function Details() {
               />
 
               <button type="submit" className="primary" style={{ marginTop: '18px' }}>
-                Save Reply to MySQL
+                Save
               </button>
             </form>
           </div>
@@ -3160,7 +3227,7 @@ function Visits() {
         status: visitStatusToSave
       });
       setShowModal(false);
-      setToast('Visit scheduled & saved to MySQL!');
+      setToast('Visit scheduled & saved!');
       setTimeout(() => setToast(''), 4000);
       loadData(false);
       window.dispatchEvent(new CustomEvent('portal-refresh'));
@@ -3195,7 +3262,7 @@ function Visits() {
       });
 
       await api.updateVisit(visitId, { status: newStatus });
-      setToast(`Visit status updated to "${newStatus}" in MySQL!`);
+      setToast(`Visit status updated to "${newStatus}"!`);
       setTimeout(() => setToast(''), 4000);
       loadData(false);
       window.dispatchEvent(new CustomEvent('portal-refresh'));
@@ -3556,7 +3623,7 @@ function Visits() {
                   Cancel
                 </button>
                 <button type="submit" className="btn-save">
-                  <Check size={16} /> Save Visit to MySQL
+                  <Check size={16} /> Save
                 </button>
               </div>
             </form>
@@ -3634,8 +3701,8 @@ function Complaints() {
       setNewComplaint({ client_id: clients[0]?.id || '', subject: '', description: '', status: 'open' });
       setToast(
         isAdmin && selectedClient?.partner_name
-          ? `Complaint raised specifically for Channel Partner "${selectedClient.partner_name}" in MySQL!`
-          : 'Complaint raised and saved to MySQL!'
+          ? `Complaint raised specifically for Channel Partner "${selectedClient.partner_name}"!`
+          : 'Complaint raised and saved!'
       );
       setTimeout(() => setToast(''), 4000);
       loadData();
@@ -3653,7 +3720,7 @@ function Complaints() {
         admin_reply: replyText
       });
       setShowReplyModal(false);
-      setToast(`Ticket #C${String(selectedComplaint.id).padStart(3, '0')} response & status saved to MySQL!`);
+      setToast(`Ticket #C${String(selectedComplaint.id).padStart(3, '0')} response & status saved!`);
       setTimeout(() => setToast(''), 4000);
       loadData();
     } catch (err) {
@@ -3664,7 +3731,7 @@ function Complaints() {
   const handleQuickStatus = async (complaintId, newStatus) => {
     try {
       await api.updateComplaint(complaintId, { status: newStatus });
-      setToast(`Ticket #C${String(complaintId).padStart(3, '0')} status updated to "${newStatus}" in MySQL!`);
+      setToast(`Ticket #C${String(complaintId).padStart(3, '0')} status updated to "${newStatus}"!`);
       setTimeout(() => setToast(''), 4000);
       loadData();
     } catch (err) {
@@ -3984,7 +4051,7 @@ function Complaints() {
 
               <div className="modal-footer-actions">
                 <button type="button" className="btn-cancel" onClick={() => setShowReplyModal(false)}>Cancel</button>
-                <button type="submit" className="btn-save"><Check size={16} /> Save Reply</button>
+                <button type="submit" className="btn-save"><Check size={16} /> Save</button>
               </div>
             </form>
           </div>
