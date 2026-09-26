@@ -22,7 +22,53 @@ dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 
-app.use(cors({ origin: true, credentials: true }));
+// Configured CORS controls for cross-origin frontend-backend communication
+const defaultAllowedOrigins = [
+  'https://park-solitaire-clientapp.vercel.app',
+  'https://park-solitaire-client-app-production.up.railway.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3000'
+];
+
+const envOrigins = (process.env.CLIENT_ORIGIN || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+const allowedOrigins = [...new Set([...defaultAllowedOrigins, ...envOrigins])];
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // 1. Allow non-browser requests (e.g. mobile apps, Postman, curl, server-to-server)
+    if (!origin) return callback(null, true);
+
+    // 2. Exact match against whitelist
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // 3. Allow Vercel preview deployments for this project
+    if (origin.endsWith('.vercel.app') && (origin.includes('park-solitaire') || origin.includes('tanu222003'))) {
+      return callback(null, true);
+    }
+
+    // 4. Allow any local development port
+    if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      return callback(null, true);
+    }
+
+    // 5. Origin is disallowed: omit Access-Control-Allow-Origin header so browser blocks cross-origin access
+    console.warn(`[CORS Policy] Blocked unauthorized origin: ${origin}`);
+    return callback(null, false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 const apiInfo = {
