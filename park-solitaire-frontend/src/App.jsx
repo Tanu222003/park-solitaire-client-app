@@ -1171,9 +1171,7 @@ function ClientVisitsWidget({
   visits = [],
   clientsList = [],
   prefix = '/partner',
-  openUserDetails,
-  onUpdateStatus,
-  onOpenSchedule
+  openUserDetails
 }) {
   const [activeTab, setActiveTab] = useState('today');
 
@@ -1210,23 +1208,13 @@ function ClientVisitsWidget({
         </div>
 
         <div className="upcoming-visits-actions">
-          {onOpenSchedule && (
-            <button
-              type="button"
-              className="btn-quick-schedule"
-              onClick={() => onOpenSchedule(activeTab === 'tomorrow' ? 'tomorrow' : 'today')}
-              title="Schedule a new client site visit"
-            >
-              <Plus size={14} /> Schedule Visit
-            </button>
-          )}
           <Link to={`${prefix}/visits`} className="view-all-link">
             All Visits ({visits.length})
           </Link>
         </div>
       </div>
 
-      {/* Tab toggle: Today vs Tomorrow vs All vs Schedule Visit */}
+      {/* Tab toggle: Today vs Tomorrow vs All */}
       <div className="visit-tab-toggle-bar">
         <button
           type="button"
@@ -1263,18 +1251,6 @@ function ClientVisitsWidget({
             {visits.length}
           </span>
         </button>
-
-        {onOpenSchedule && (
-          <button
-            type="button"
-            className="visit-tab-btn btn-tab-schedule"
-            onClick={() => onOpenSchedule(activeTab === 'tomorrow' ? 'tomorrow' : 'today')}
-            title="Schedule a new client site visit"
-          >
-            <Plus size={15} />
-            <span>+ Schedule Visit</span>
-          </button>
-        )}
       </div>
 
       {/* Visits List */}
@@ -1323,20 +1299,6 @@ function ClientVisitsWidget({
                     <span className={`visit-status-pill status-${(v.status || 'Upcoming').toLowerCase()}`}>
                       {isVisitStatusLocked(v.status) ? '🔒 ' : ''}{v.status || 'Upcoming'}
                     </span>
-
-                    {onUpdateStatus && !isVisitStatusLocked(v.status) && (
-                      <select
-                        className="status-dropdown"
-                        value={v.status || 'Upcoming'}
-                        onChange={(e) => onUpdateStatus(v.id, e.target.value)}
-                        style={{ fontSize: '11px', padding: '3px 8px', borderRadius: '6px', border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: '600', color: '#075c4d' }}
-                        title="Update visit status in MySQL"
-                      >
-                        {getForwardStages(v.status).map((st) => (
-                          <option key={st} value={st}>{st}</option>
-                        ))}
-                      </select>
-                    )}
                   </div>
                 </div>
 
@@ -1463,15 +1425,6 @@ function Dashboard({ admin = false }) {
   const [paymentsList, setPaymentsList] = useState([]);
   const [complaintsList, setComplaintsList] = useState([]);
   const [toast, setToast] = useState('');
-  const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [scheduleSubmitting, setScheduleSubmitting] = useState(false);
-  const [newVisit, setNewVisit] = useState({
-    client_id: '',
-    visit_date: '',
-    visit_time: '11:00 AM',
-    notes: '',
-    status: 'Upcoming'
-  });
   const prefix = admin ? '/admin' : '/partner';
 
   const loadDashboardData = () => {
@@ -1498,104 +1451,6 @@ function Dashboard({ admin = false }) {
       window.removeEventListener('storage', handleRefresh);
     };
   }, [admin]);
-
-  const handleUpdateVisitStatus = async (visitId, newStatus) => {
-    try {
-      const currentVisit = visits.find((v) => Number(v.id) === Number(visitId));
-      if (currentVisit) {
-        if (isVisitStatusLocked(currentVisit.status)) {
-          alert(`Status is already marked as "${currentVisit.status}". Once Booked or Closed, no further status changes are permitted.`);
-          return;
-        }
-        const curW = getStageWeight(currentVisit.status);
-        const tgtW = getStageWeight(newStatus);
-        if (tgtW < curW) {
-          alert(`Cannot revert visit status backwards in the flow from "${currentVisit.status}" to "${newStatus}". Progression is strictly forward.`);
-          return;
-        }
-      }
-
-      const nowIso = new Date().toISOString();
-      setVisits((prev) => {
-        const target = prev.find((v) => Number(v.id) === Number(visitId));
-        if (!target) return prev;
-        const updated = { ...target, status: newStatus, updated_at: nowIso };
-        const others = prev.filter((v) => Number(v.id) !== Number(visitId));
-        return [updated, ...others];
-      });
-
-      await api.updateVisit(visitId, { status: newStatus });
-      setToast(`Visit marked as ${newStatus}!`);
-      setTimeout(() => setToast(''), 3500);
-      loadDashboardData();
-    } catch (err) {
-      alert(err.message || 'Failed to update visit status');
-      loadDashboardData();
-    }
-  };
-
-  const now = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-  const tomorrowObj = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  const tomorrowStr = `${tomorrowObj.getFullYear()}-${pad(tomorrowObj.getMonth() + 1)}-${pad(tomorrowObj.getDate())}`;
-
-  const openScheduleModal = (presetDay = 'today') => {
-    const targetDate = presetDay === 'tomorrow' ? tomorrowStr : todayStr;
-
-    // Refresh client list if empty
-    api.getClients().then((res) => {
-      if (Array.isArray(res) && res.length > 0) {
-        setClientsList(res);
-        setNewVisit((prev) => ({
-          ...prev,
-          client_id: prev.client_id || String(res[0].id)
-        }));
-      }
-    }).catch(() => {});
-
-    const firstClientId = clientsList && clientsList.length > 0 ? String(clientsList[0].id) : '';
-
-    setNewVisit({
-      client_id: firstClientId,
-      visit_date: targetDate,
-      visit_time: '11:00 AM',
-      notes: '',
-      status: 'Upcoming'
-    });
-    setShowScheduleModal(true);
-  };
-
-  const handleScheduleSubmit = async (e) => {
-    e.preventDefault();
-    if (!newVisit.client_id) {
-      alert('Please select a client from the list.');
-      return;
-    }
-    if (!newVisit.visit_date) {
-      alert('Please select a visit date.');
-      return;
-    }
-    setScheduleSubmitting(true);
-    try {
-      await api.createVisit({
-        client_id: Number(newVisit.client_id),
-        visit_date: newVisit.visit_date,
-        visit_time: newVisit.visit_time || '11:00 AM',
-        notes: newVisit.notes || '',
-        status: newVisit.status || 'Upcoming'
-      });
-      setShowScheduleModal(false);
-      setToast('Visit successfully scheduled & saved!');
-      setTimeout(() => setToast(''), 4000);
-      loadDashboardData();
-      window.dispatchEvent(new CustomEvent('portal-refresh'));
-    } catch (err) {
-      alert(err.message || 'Failed to schedule visit');
-    } finally {
-      setScheduleSubmitting(false);
-    }
-  };
 
   const rawActivities = [];
   (clientsList || []).slice(0, 4).forEach((c) => {
@@ -1653,120 +1508,7 @@ function Dashboard({ admin = false }) {
         </div>
       )}
 
-      {showScheduleModal && (
-        <div className="modal-overlay" onClick={() => setShowScheduleModal(false)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <CalendarDays size={18} style={{ color: '#075c4d' }} />
-                <h3 style={{ margin: 0 }}>Schedule Client Visit</h3>
-              </div>
-              <button type="button" className="close-btn" onClick={() => setShowScheduleModal(false)}>
-                <X size={18} />
-              </button>
-            </div>
 
-            <form onSubmit={handleScheduleSubmit}>
-              <div className="modal-scroll-body">
-                <div className="form-field" style={{ marginBottom: '12px' }}>
-                  <label>Select Client *</label>
-                  {(!clientsList || clientsList.length === 0) ? (
-                    <div style={{ padding: '10px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', color: '#991b1b', fontSize: '12.5px' }}>
-                      No clients registered yet. <Link to={`${prefix}/clients`} style={{ textDecoration: 'underline', fontWeight: 600, color: '#075c4d' }}>+ Add a Client first</Link>
-                    </div>
-                  ) : (
-                    <select
-                      value={String(newVisit.client_id || '')}
-                      onChange={(e) => setNewVisit({ ...newVisit, client_id: e.target.value })}
-                      required
-                    >
-                      <option value="">-- Choose Client --</option>
-                      {clientsList.map((c) => (
-                        <option key={c.id} value={String(c.id)}>
-                          {c.name} ({c.phone || 'No phone'} • {c.unit_type || '2 BHK'})
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-
-                {/* Quick Date Selection Chips */}
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
-                  <button
-                    type="button"
-                    className={`time-preset-btn ${newVisit.visit_date === todayStr ? 'active' : ''}`}
-                    onClick={() => setNewVisit({ ...newVisit, visit_date: todayStr })}
-                  >
-                    📅 Today
-                  </button>
-                  <button
-                    type="button"
-                    className={`time-preset-btn ${newVisit.visit_date === tomorrowStr ? 'active' : ''}`}
-                    onClick={() => setNewVisit({ ...newVisit, visit_date: tomorrowStr })}
-                  >
-                    ⚡ Tomorrow
-                  </button>
-                </div>
-
-                <div className="form-grid-2" style={{ marginBottom: '12px' }}>
-                  <div className="form-field">
-                    <label>Visit Date *</label>
-                    <input
-                      type="date"
-                      required
-                      value={newVisit.visit_date}
-                      onChange={(e) => setNewVisit({ ...newVisit, visit_date: e.target.value })}
-                    />
-                  </div>
-                  <div className="form-field">
-                    <label>Visit Time</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 11:30 AM"
-                      value={newVisit.visit_time}
-                      onChange={(e) => setNewVisit({ ...newVisit, visit_time: e.target.value })}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-field" style={{ marginBottom: '12px' }}>
-                  <label>Visit Status</label>
-                  <select
-                    value={newVisit.status}
-                    onChange={(e) => setNewVisit({ ...newVisit, status: e.target.value })}
-                  >
-                    <option value="Upcoming">Upcoming</option>
-                    <option value="Visited">Visited</option>
-                    <option value="FollowUp">FollowUp</option>
-                    <option value="Revisited">Revisited</option>
-                    <option value="Booked">Booked</option>
-                    <option value="Closed">Closed</option>
-                  </select>
-                </div>
-
-                <div className="form-field">
-                  <label>Remarks / Visit Agenda</label>
-                  <textarea
-                    rows={3}
-                    value={newVisit.notes}
-                    onChange={(e) => setNewVisit({ ...newVisit, notes: e.target.value })}
-                    placeholder="e.g. Site tour of 2 BHK show flat and review pricing breakdown"
-                  />
-                </div>
-              </div>
-
-              <div className="modal-footer-actions">
-                <button type="button" className="btn-cancel" onClick={() => setShowScheduleModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn-save" disabled={scheduleSubmitting}>
-                  <Check size={16} /> {scheduleSubmitting ? 'Saving...' : 'Save'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {admin ? (
         <>
@@ -1846,8 +1588,6 @@ function Dashboard({ admin = false }) {
             clientsList={clientsList}
             prefix={prefix}
             openUserDetails={openUserDetails}
-            onUpdateStatus={handleUpdateVisitStatus}
-            onOpenSchedule={openScheduleModal}
           />
 
           {/* Recent Activity Log Section */}
@@ -1946,8 +1686,6 @@ function Dashboard({ admin = false }) {
             clientsList={clientsList}
             prefix={prefix}
             openUserDetails={openUserDetails}
-            onUpdateStatus={handleUpdateVisitStatus}
-            onOpenSchedule={openScheduleModal}
           />
 
           {/* Recent Activities Section (Figma Screen 5) */}
