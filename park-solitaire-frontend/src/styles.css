@@ -3739,9 +3739,19 @@ input:focus, select:focus, textarea:focus {
 .visit-tab-toggle-bar {
   display: flex;
   gap: 8px;
-  padding: 10px 20px;
+  padding: 10px 18px;
   background: #f8faf9;
   border-bottom: 1px solid #edf2f0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-behavior: smooth;
+  white-space: nowrap;
+}
+
+.visit-tab-toggle-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .visit-tab-btn {
@@ -3751,12 +3761,16 @@ input:focus, select:focus, textarea:focus {
   background: #ffffff;
   border: 1px solid #d6e2dd;
   border-radius: 24px;
-  padding: 6px 14px;
+  padding: 7px 15px;
   font-size: 13px;
   font-weight: 600;
   color: #4b5563;
   cursor: pointer;
   transition: all 0.15s ease;
+  flex-shrink: 0;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .visit-tab-btn:hover {
@@ -3769,6 +3783,24 @@ input:focus, select:focus, textarea:focus {
   border-color: #075c4d;
   color: #ffffff;
   box-shadow: 0 2px 6px rgba(7, 92, 77, 0.25);
+}
+
+.visit-tab-btn.btn-tab-schedule {
+  background: #ecfdf5;
+  border: 1px dashed #059669;
+  color: #047857;
+  font-weight: 700;
+}
+
+.visit-tab-btn.btn-tab-schedule:hover {
+  background: #d1fae5;
+  border-style: solid;
+  border-color: #047857;
+}
+
+.visit-tab-btn.btn-tab-schedule:active {
+  background: #047857;
+  color: #ffffff;
 }
 
 .visit-tab-count {
@@ -4158,6 +4190,12 @@ input:focus, select:focus, textarea:focus {
   .upcoming-visits-actions {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .visit-tab-toggle-bar {
+    padding: 10px 14px;
+    gap: 8px;
+    scroll-padding: 0 14px;
   }
 
   .visit-contact-actions {

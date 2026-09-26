@@ -1210,13 +1210,23 @@ function ClientVisitsWidget({
         </div>
 
         <div className="upcoming-visits-actions">
+          {onOpenSchedule && (
+            <button
+              type="button"
+              className="btn-quick-schedule"
+              onClick={() => onOpenSchedule(activeTab === 'tomorrow' ? 'tomorrow' : 'today')}
+              title="Schedule a new client site visit"
+            >
+              <Plus size={14} /> Schedule Visit
+            </button>
+          )}
           <Link to={`${prefix}/visits`} className="view-all-link">
             All Visits ({visits.length})
           </Link>
         </div>
       </div>
 
-      {/* Tab toggle: Today vs Tomorrow vs All */}
+      {/* Tab toggle: Today vs Tomorrow vs All vs Schedule Visit */}
       <div className="visit-tab-toggle-bar">
         <button
           type="button"
@@ -1253,6 +1263,18 @@ function ClientVisitsWidget({
             {visits.length}
           </span>
         </button>
+
+        {onOpenSchedule && (
+          <button
+            type="button"
+            className="visit-tab-btn btn-tab-schedule"
+            onClick={() => onOpenSchedule(activeTab === 'tomorrow' ? 'tomorrow' : 'today')}
+            title="Schedule a new client site visit"
+          >
+            <Plus size={15} />
+            <span>+ Schedule Visit</span>
+          </button>
+        )}
       </div>
 
       {/* Visits List */}
@@ -1519,7 +1541,6 @@ function Dashboard({ admin = false }) {
   const tomorrowStr = `${tomorrowObj.getFullYear()}-${pad(tomorrowObj.getMonth() + 1)}-${pad(tomorrowObj.getDate())}`;
 
   const openScheduleModal = (presetDay = 'today') => {
-    if (!admin) return;
     const targetDate = presetDay === 'tomorrow' ? tomorrowStr : todayStr;
 
     // Refresh client list if empty
@@ -1632,7 +1653,7 @@ function Dashboard({ admin = false }) {
         </div>
       )}
 
-      {admin && showScheduleModal && (
+      {showScheduleModal && (
         <div className="modal-overlay" onClick={() => setShowScheduleModal(false)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
@@ -1926,7 +1947,7 @@ function Dashboard({ admin = false }) {
             prefix={prefix}
             openUserDetails={openUserDetails}
             onUpdateStatus={handleUpdateVisitStatus}
-            onOpenSchedule={undefined}
+            onOpenSchedule={openScheduleModal}
           />
 
           {/* Recent Activities Section (Figma Screen 5) */}

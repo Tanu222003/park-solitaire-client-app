@@ -524,9 +524,6 @@ function handleMockRequest(endpoint, options = {}) {
 
   // POST /visits
   if (endpoint === "/visits" && method === "POST") {
-    if (currentUser.role !== 'admin') {
-      throw new Error('Channel Partners cannot schedule visits. Only Admin can schedule visits.');
-    }
     const clientId = Number(body.client_id);
     const client = store.clients.find(c => Number(c.id) === clientId);
     const partnerId = client?.partner_id || (currentUser.role === 'partner' ? currentUser.id : 2);
