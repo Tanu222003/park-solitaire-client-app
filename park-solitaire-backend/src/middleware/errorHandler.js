@@ -8,8 +8,19 @@ export function notFound(req, res) {
 export function errorHandler(err, req, res, _next) {
   console.error(`[${req.method} ${req.originalUrl}]`, err);
 
-  const status = err.status || 500;
-  const payload = { message: err.message || 'Something went wrong on the server' };
+  const isDbError =
+    err.code === 'ECONNREFUSED' ||
+    err.code === 'ETIMEDOUT' ||
+    err.code === 'ER_SERVER_SHUTDOWN' ||
+    err.code === 'PROTOCOL_CONNECTION_LOST';
+
+  const status = isDbError ? 503 : (err.status || 500);
+  const payload = {
+    message: isDbError
+      ? 'Database service is temporarily reconnecting. Please retry in a few moments.'
+      : (err.message || 'Something went wrong on the server'),
+    ...(err.code ? { code: err.code } : {})
+  };
 
   if (process.env.NODE_ENV !== 'production' && err.stack) {
     payload.stack = err.stack.split('\n').slice(0, 5);

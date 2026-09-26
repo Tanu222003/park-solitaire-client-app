@@ -35,9 +35,13 @@ if (connUrl && !process.env.DB_HOST && !process.env.MYSQLHOST) {
 const pool = mysql.createPool({
   ...dbConfig,
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 15,
   queueLimit: 0,
-  dateStrings: true
+  dateStrings: true,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
+  maxIdle: 10,
+  idleTimeout: 60000
 });
 
 export async function initDatabase() {
