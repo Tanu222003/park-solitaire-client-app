@@ -6,7 +6,7 @@ import {
   LogIn, LogOut, Menu, MessageSquare, MoreHorizontal, Plus, Search,
   Send, Settings, Users, X, Phone, Mail, MapPin, Building, Tag,
   UserCheck, ShieldAlert, Clock, FileText, Landmark, CreditCard,
-  BarChart2, TrendingUp
+  BarChart2, TrendingUp, KeyRound, RotateCcw, ShieldCheck
 } from 'lucide-react';
 import { api, getServerUrl, setServerUrl } from './api';
 
@@ -495,9 +495,22 @@ function Login({ defaultRole = 'partner' }) {
           <Lock size={15} />
         </div>
 
-        {role === 'partner' && <div className="forgot">Forgot Password?</div>}
+        <div className="forgot" style={{ display: 'flex', justifyContent: 'flex-end', margin: '8px 0 16px' }}>
+          <Link
+            to={`/forgot-password?role=${role}`}
+            style={{
+              fontSize: '12.5px',
+              color: '#075c4d',
+              fontWeight: '600',
+              textDecoration: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            Forgot Password?
+          </Link>
+        </div>
 
-        <button type="submit" className="primary" disabled={loading} style={{ marginTop: role === 'admin' ? '20px' : '0' }}>
+        <button type="submit" className="primary" disabled={loading}>
           <LogIn size={16} />
           {loading ? 'Verifying...' : role === 'admin' ? 'Verify & Continue' : 'Login'}
         </button>
@@ -649,6 +662,482 @@ function Register() {
 
       <div className="foot">
         Already have an account? <Link to="/login">Login</Link>
+      </div>
+    </Auth>
+  );
+}
+
+function ForgotPassword() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const queryParams = new URLSearchParams(location.search);
+  const initialRole = queryParams.get('role') === 'admin' ? 'admin' : 'partner';
+
+  const [role, setRole] = useState(initialRole);
+  const [step, setStep] = useState(1);
+  const [identifier, setIdentifier] = useState('');
+  const [otp, setOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [maskedTarget, setMaskedTarget] = useState('');
+  const [demoOtp, setDemoOtp] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const [countdown, setCountdown] = useState(0);
+
+  useEffect(() => {
+    const qRole = new URLSearchParams(location.search).get('role');
+    if (qRole === 'admin' || qRole === 'partner') {
+      setRole(qRole);
+    }
+  }, [location.search]);
+
+  useEffect(() => {
+    let timer;
+    if (countdown > 0) {
+      timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [countdown]);
+
+  const handleSwitchTab = (newRole) => {
+    setRole(newRole);
+    setError('');
+    setSuccessMsg('');
+    setStep(1);
+    setOtp('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setDemoOtp('');
+    navigate(`/forgot-password?role=${newRole}`, { replace: true });
+  };
+
+  const handleSendOtp = async (e) => {
+    e?.preventDefault();
+    setError('');
+    setSuccessMsg('');
+
+    const cleanId = identifier.trim();
+    if (!cleanId) {
+      setError(
+        role === 'admin'
+          ? 'Please enter your Admin Email or Mobile Number.'
+          : 'Please enter your registered Mobile Number or Email.'
+      );
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.sendForgotPasswordOtp({ identifier: cleanId, role });
+      setMaskedTarget(res.maskedTarget || cleanId);
+      if (res.otp) {
+        setDemoOtp(res.otp);
+      }
+      setSuccessMsg(res.message || 'OTP sent successfully!');
+      setStep(2);
+      setCountdown(30);
+    } catch (err) {
+      setError(err.message || 'Failed to send OTP. Please check your details.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (countdown > 0 || loading) return;
+    setError('');
+    setSuccessMsg('');
+    setLoading(true);
+    try {
+      const res = await api.sendForgotPasswordOtp({ identifier: identifier.trim(), role });
+      if (res.otp) {
+        setDemoOtp(res.otp);
+      }
+      setSuccessMsg('A new OTP has been sent.');
+      setCountdown(30);
+    } catch (err) {
+      setError(err.message || 'Failed to resend OTP.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e) => {
+    e?.preventDefault();
+    setError('');
+    setSuccessMsg('');
+
+    const cleanOtp = otp.trim();
+    if (!cleanOtp || cleanOtp.length !== 6) {
+      setError('Please enter a valid 6-digit OTP code.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.verifyForgotPasswordOtp({
+        identifier: identifier.trim(),
+        otp: cleanOtp,
+        role
+      });
+      setSuccessMsg(res.message || 'OTP verified successfully.');
+      setStep(3);
+    } catch (err) {
+      setError(err.message || 'Invalid or expired OTP code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e?.preventDefault();
+    setError('');
+    setSuccessMsg('');
+
+    if (!newPassword) {
+      setError('Please enter a new password.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match. Please re-enter.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.resetForgotPassword({
+        identifier: identifier.trim(),
+        otp: otp.trim(),
+        newPassword,
+        role
+      });
+      setSuccessMsg(res.message || 'Password reset successfully!');
+      setStep(4);
+    } catch (err) {
+      setError(err.message || 'Failed to reset password.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loginPath = role === 'admin' ? '/admin/login' : '/login';
+
+  return (
+    <Auth>
+      <div className="tabs" style={{ marginBottom: '20px' }}>
+        <button
+          type="button"
+          className={role === 'partner' ? 'on' : ''}
+          onClick={() => handleSwitchTab('partner')}
+        >
+          Channel Partner
+        </button>
+        <button
+          type="button"
+          className={role === 'admin' ? 'on' : ''}
+          onClick={() => handleSwitchTab('admin')}
+        >
+          Admin
+        </button>
+      </div>
+
+      {step < 4 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '22px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span
+              style={{
+                width: '24px',
+                height: '24px',
+                borderRadius: '50%',
+                background: step >= 1 ? '#075c4d' : '#e2e8f0',
+                color: step >= 1 ? '#fff' : '#64748b',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '11px',
+                fontWeight: '700'
+              }}
+            >
+              1
+            </span>
+            <span style={{ fontSize: '11.5px', fontWeight: step === 1 ? '700' : '500', color: step === 1 ? '#075c4d' : '#64748b' }}>
+              Request
+            </span>
+          </div>
+          <div style={{ width: '18px', height: '2px', background: step >= 2 ? '#075c4d' : '#e2e8f0' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span
+              style={{
+                width: '24px',
+                height: '24px',
+                borderRadius: '50%',
+                background: step >= 2 ? '#075c4d' : '#e2e8f0',
+                color: step >= 2 ? '#fff' : '#64748b',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '11px',
+                fontWeight: '700'
+              }}
+            >
+              2
+            </span>
+            <span style={{ fontSize: '11.5px', fontWeight: step === 2 ? '700' : '500', color: step === 2 ? '#075c4d' : '#64748b' }}>
+              Verify OTP
+            </span>
+          </div>
+          <div style={{ width: '18px', height: '2px', background: step >= 3 ? '#075c4d' : '#e2e8f0' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span
+              style={{
+                width: '24px',
+                height: '24px',
+                borderRadius: '50%',
+                background: step >= 3 ? '#075c4d' : '#e2e8f0',
+                color: step >= 3 ? '#fff' : '#64748b',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '11px',
+                fontWeight: '700'
+              }}
+            >
+              3
+            </span>
+            <span style={{ fontSize: '11.5px', fontWeight: step === 3 ? '700' : '500', color: step === 3 ? '#075c4d' : '#64748b' }}>
+              New Password
+            </span>
+          </div>
+        </div>
+      )}
+
+      {error && <div className="err-msg">{error}</div>}
+      {successMsg && step !== 4 && <div className="succ-msg">{successMsg}</div>}
+
+      {step === 1 && (
+        <>
+          <h1 style={{ color: '#075c4d', marginTop: 0, textAlign: 'center' }}>Forgot Password</h1>
+          <p style={{ textAlign: 'center', marginBottom: '20px' }}>
+            Reset your {role === 'admin' ? 'Admin' : 'Channel Partner'} password using an OTP sent to your registered email or mobile number.
+          </p>
+
+          <form onSubmit={handleSendOtp}>
+            <label>{role === 'admin' ? 'Admin Email / Mobile Number' : 'Registered Mobile Number or Email'}</label>
+            <input
+              type="text"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder={role === 'admin' ? 'e.g. admin@parksolitaire.com' : 'e.g. 9820012345 or partner@firm.com'}
+              autoFocus
+            />
+
+            <button type="submit" className="primary" disabled={loading} style={{ marginTop: '18px' }}>
+              <KeyRound size={16} />
+              {loading ? 'Sending OTP...' : 'Send OTP Code'}
+            </button>
+          </form>
+        </>
+      )}
+
+      {step === 2 && (
+        <>
+          <h1 style={{ color: '#075c4d', marginTop: 0, textAlign: 'center' }}>Verify OTP</h1>
+          <p style={{ textAlign: 'center', marginBottom: '14px' }}>
+            Enter the 6-digit OTP code sent to <strong>{maskedTarget || identifier}</strong>.
+          </p>
+
+          {demoOtp && (
+            <div
+              style={{
+                background: '#eef8f5',
+                border: '1px solid #c2e5dc',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                fontSize: '13px',
+                color: '#075c4d',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}
+            >
+              <span>
+                Verification OTP: <strong style={{ letterSpacing: '1px' }}>{demoOtp}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => setOtp(demoOtp)}
+                style={{
+                  background: '#075c4d',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '5px',
+                  padding: '5px 10px',
+                  fontSize: '11.5px',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Auto-fill
+              </button>
+            </div>
+          )}
+
+          <form onSubmit={handleVerifyOtp}>
+            <label>6-Digit Verification Code</label>
+            <input
+              type="text"
+              maxLength={6}
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="••••••"
+              style={{
+                textAlign: 'center',
+                fontSize: '22px',
+                letterSpacing: '8px',
+                fontWeight: '700'
+              }}
+              autoFocus
+            />
+
+            <button type="submit" className="primary" disabled={loading} style={{ marginTop: '18px' }}>
+              <CheckCircle2 size={16} />
+              {loading ? 'Verifying...' : 'Verify OTP'}
+            </button>
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginTop: '16px',
+                fontSize: '12.5px'
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setStep(1);
+                  setError('');
+                  setSuccessMsg('');
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#075c4d',
+                  padding: 0,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  textDecoration: 'underline'
+                }}
+              >
+                Change Email / Mobile
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResendOtp}
+                disabled={countdown > 0 || loading}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: countdown > 0 ? '#94a3b8' : '#075c4d',
+                  fontWeight: '600',
+                  padding: 0,
+                  fontSize: '12px',
+                  cursor: countdown > 0 ? 'default' : 'pointer'
+                }}
+              >
+                {countdown > 0 ? `Resend OTP in ${countdown}s` : 'Resend OTP'}
+              </button>
+            </div>
+          </form>
+        </>
+      )}
+
+      {step === 3 && (
+        <>
+          <h1 style={{ color: '#075c4d', marginTop: 0, textAlign: 'center' }}>Set New Password</h1>
+          <p style={{ textAlign: 'center', marginBottom: '20px' }}>
+            Choose a strong new password for your account (at least 6 characters).
+          </p>
+
+          <form onSubmit={handleResetPassword}>
+            <label>New Password</label>
+            <div className="pw">
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password (min. 6 characters)"
+                autoFocus
+              />
+              <Lock size={15} />
+            </div>
+
+            <label>Confirm New Password</label>
+            <div className="pw">
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Re-enter new password"
+              />
+              <Lock size={15} />
+            </div>
+
+            <button type="submit" className="primary" disabled={loading} style={{ marginTop: '18px' }}>
+              <ShieldCheck size={16} />
+              {loading ? 'Saving...' : 'Save New Password'}
+            </button>
+          </form>
+        </>
+      )}
+
+      {step === 4 && (
+        <div style={{ textAlign: 'center', padding: '10px 0' }}>
+          <div
+            style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: '#dcfce7',
+              color: '#166534',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '16px'
+            }}
+          >
+            <CheckCircle2 size={36} />
+          </div>
+          <h1 style={{ color: '#075c4d', marginTop: 0 }}>Password Reset Complete!</h1>
+          <p style={{ marginBottom: '24px' }}>
+            Your {role === 'admin' ? 'Admin' : 'Channel Partner'} password has been successfully updated in the MySQL database.
+          </p>
+          <Link
+            to={loginPath}
+            className="primary"
+            style={{
+              display: 'flex',
+              textDecoration: 'none',
+              justifyContent: 'center'
+            }}
+          >
+            <LogIn size={16} /> Proceed to Login
+          </Link>
+        </div>
+      )}
+
+      <div className="foot" style={{ marginTop: '22px' }}>
+        Remember your password? <Link to={loginPath}>Back to Login</Link>
       </div>
     </Auth>
   );
@@ -4601,6 +5090,9 @@ function App() {
         <Route path="/admin/login" element={<Login defaultRole="admin" />} />
         <Route path="/admin-login" element={<Login defaultRole="admin" />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/admin/forgot-password" element={<ForgotPassword />} />
+        <Route path="/partner/forgot-password" element={<ForgotPassword />} />
 
         {/* Direct Shortcuts / Aliases */}
         <Route path="/admin" element={<Navigate to="/admin/login" replace />} />

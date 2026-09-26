@@ -110,6 +110,24 @@ export async function initDatabase() {
     await connection.query("UPDATE users SET firm_name = 'Solitaire Realty Group', phone2 = '+91 98200 54321' WHERE email = 'partner@parksolitaire.com' AND (firm_name IS NULL OR firm_name = '')");
   } catch (err) {}
 
+  // Ensure password_reset_otps table exists
+  try {
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS password_reset_otps (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        identifier VARCHAR(150) NOT NULL,
+        otp_code VARCHAR(10) NOT NULL,
+        role VARCHAR(20) NOT NULL,
+        expires_at DATETIME NOT NULL,
+        used BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_otp_identifier (identifier),
+        INDEX idx_otp_code (otp_code)
+      )
+    `);
+  } catch (err) {}
+
   // Ensure sample visits for today and tomorrow are present
   try {
     const [todayCount] = await connection.query('SELECT COUNT(*) AS c FROM visits WHERE visit_date = CURDATE()');

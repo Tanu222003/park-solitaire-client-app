@@ -417,6 +417,56 @@ function handleMockRequest(endpoint, options = {}) {
     return saved ? JSON.parse(saved) : store.users[0];
   }
 
+  // POST /auth/forgot-password/send-otp
+  if (endpoint === "/auth/forgot-password/send-otp") {
+    const identifier = (body.identifier || "").trim();
+    if (!identifier) {
+      const err = new Error("Email or mobile number is required");
+      err.status = 400;
+      throw err;
+    }
+    const isEmail = identifier.includes("@");
+    const masked = isEmail
+      ? identifier.replace(/(.{2})(.*)(?=@)/, "$1***")
+      : (identifier.length >= 4 ? `+91 ******${identifier.slice(-4)}` : identifier);
+    return {
+      success: true,
+      message: `OTP sent successfully to ${masked}`,
+      otp: "123456",
+      maskedTarget: masked,
+      identifier,
+      role: body.role || "partner"
+    };
+  }
+
+  // POST /auth/forgot-password/verify-otp
+  if (endpoint === "/auth/forgot-password/verify-otp") {
+    const otp = (body.otp || "").toString().trim();
+    if (!otp || otp.length !== 6) {
+      const err = new Error("Please enter a valid 6-digit OTP code");
+      err.status = 400;
+      throw err;
+    }
+    return {
+      success: true,
+      message: "OTP verified successfully. You may now set a new password."
+    };
+  }
+
+  // POST /auth/forgot-password/reset
+  if (endpoint === "/auth/forgot-password/reset") {
+    const newPwd = body.newPassword || body.new_password;
+    if (!newPwd || newPwd.length < 6) {
+      const err = new Error("Password must be at least 6 characters long");
+      err.status = 400;
+      throw err;
+    }
+    return {
+      success: true,
+      message: "Password reset successful! You can now log in with your new password."
+    };
+  }
+
   // Current authenticated user context
   let currentUser = { id: 2, name: 'Rahul Sharma', role: 'partner', firm_name: 'Shree Realty Advisory', phone: '+91 98200 12345', email: 'cp@realty.com' };
   try {
@@ -785,7 +835,7 @@ async function request(endpoint, options = {}) {
     localStorage.removeItem("user");
     localStorage.removeItem("ps_demo_store");
     token = null;
-    if (typeof window !== "undefined" && window.location && !window.location.pathname.includes("/login")) {
+    if (typeof window !== "undefined" && window.location && !window.location.pathname.includes("/login") && !window.location.pathname.includes("/forgot-password")) {
       const isAdmin = window.location.pathname.startsWith("/admin");
       window.location.href = isAdmin ? "/admin/login?expired=1" : "/login?expired=1";
       return;
@@ -793,9 +843,9 @@ async function request(endpoint, options = {}) {
   }
 
   // Check auth requirement for protected endpoints
-  const isPublic = endpoint.startsWith("/auth/login") || endpoint.startsWith("/auth/register") || endpoint === "/health";
+  const isPublic = endpoint.startsWith("/auth/login") || endpoint.startsWith("/auth/register") || endpoint.startsWith("/auth/forgot-password") || endpoint === "/health";
   if (!token && !isPublic) {
-    if (typeof window !== "undefined" && window.location && !window.location.pathname.includes("/login")) {
+    if (typeof window !== "undefined" && window.location && !window.location.pathname.includes("/login") && !window.location.pathname.includes("/forgot-password")) {
       const isAdmin = window.location.pathname.startsWith("/admin");
       window.location.href = isAdmin ? "/admin/login?auth=required" : "/login?auth=required";
     }
@@ -827,12 +877,12 @@ async function request(endpoint, options = {}) {
     }
 
     if (!response.ok) {
-      if (response.status === 401 && !endpoint.includes("/auth/login")) {
+      if (response.status === 401 && !endpoint.includes("/auth/login") && !endpoint.includes("/auth/forgot-password")) {
         console.warn("Session token expired or invalid (401). Clearing session and redirecting.");
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         localStorage.removeItem("ps_demo_store");
-        if (typeof window !== "undefined" && window.location && !window.location.pathname.includes("/login")) {
+        if (typeof window !== "undefined" && window.location && !window.location.pathname.includes("/login") && !window.location.pathname.includes("/forgot-password")) {
           const isAdmin = window.location.pathname.startsWith("/admin");
           window.location.href = isAdmin ? "/admin/login?expired=1" : "/login?expired=1";
         }
@@ -951,5 +1001,23 @@ export const api = {
 
   getUserProfile: (id) => request(`/auth/user/${id}`),
 
-  getAdminInfo: () => request("/auth/admin-info")
+  getAdminInfo: () => request("/auth/admin-info"),
+
+  sendForgotPasswordOtp: (data) =>
+    request("/auth/forgot-password/send-otp", {
+      method: "POST",
+      body: JSON.stringify(data)
+    }),
+
+  verifyForgotPasswordOtp: (data) =>
+    request("/auth/forgot-password/verify-otp", {
+      method: "POST",
+      body: JSON.stringify(data)
+    }),
+
+  resetForgotPassword: (data) =>
+    request("/auth/forgot-password/reset", {
+      method: "POST",
+      body: JSON.stringify(data)
+    })
 };

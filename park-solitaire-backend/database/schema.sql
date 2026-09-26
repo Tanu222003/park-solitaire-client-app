@@ -95,7 +95,19 @@ CREATE TABLE IF NOT EXISTS bills (
   status              ENUM('pending', 'paid', 'rejected') NOT NULL DEFAULT 'pending',
   paid_date           DATE NULL,
   payment_reference   VARCHAR(100) NULL,
-  created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (partner_id) REFERENCES users(id) ON DELETE CASCADE,
   INDEX idx_bills_partner (partner_id)
+);
+
+CREATE TABLE IF NOT EXISTS password_reset_otps (
+  id                  INT AUTO_INCREMENT PRIMARY KEY,
+  user_id             INT NOT NULL,
+  identifier          VARCHAR(150) NOT NULL,
+  otp_code            VARCHAR(10) NOT NULL,
+  role                VARCHAR(20) NOT NULL,
+  expires_at          DATETIME NOT NULL,
+  used                BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_otp_identifier (identifier),
+  INDEX idx_otp_code (otp_code)
 );
