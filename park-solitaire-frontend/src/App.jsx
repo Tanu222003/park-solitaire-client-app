@@ -1491,11 +1491,11 @@ function Dashboard({ admin = false }) {
   });
 
   rawActivities.sort((a, b) => b.timestamp - a.timestamp);
-  const displayActivities = rawActivities.length > 0 ? rawActivities.slice(0, 4) : [
-    { id: 'def-1', title: 'New Client Added', subtitle: 'Rajesh Kumar • 3 BHK', time: '10m ago', Icon: UserCheck, color: '#059669', bg: '#dcfce7' },
-    { id: 'def-2', title: 'Site Visit Completed', subtitle: 'Anita Verma • 2 BHK', time: '1h ago', Icon: CalendarDays, color: '#d97706', bg: '#fef3c7' },
-    { id: 'def-3', title: 'Payment Received', subtitle: 'Token Amount • ₹ 1,50,000', time: '3h ago', Icon: CircleDollarSign, color: '#0284c7', bg: '#e0f2fe' }
-  ];
+  const displayActivities = rawActivities.slice(0, 4);
+
+  const partnerPaidTotal = (paymentsList || [])
+    .filter((p) => String(p.status).toLowerCase() === 'paid')
+    .reduce((sum, p) => sum + Number(p.amount || 0), 0);
 
   return (
     <Shell>
@@ -1535,13 +1535,13 @@ function Dashboard({ admin = false }) {
           <div className="admin-stats-grid-2">
             <Link to={`${prefix}/partners`} className="admin-stat-card-large">
               <small>Total Partners</small>
-              <div className="admin-stat-number">{stats?.totalPartners ?? '128'}</div>
-              <span className="admin-stat-growth">+12% this month</span>
+              <div className="admin-stat-number">{stats?.totalPartners ?? 0}</div>
+              <span className="admin-stat-growth">Active Partners</span>
             </Link>
             <Link to={`${prefix}/payments`} className="admin-stat-card-large">
               <small>Total Payment Approval</small>
               <div className="admin-stat-number">
-                ₹ {stats?.totalPaid ? Number(stats.totalPaid).toLocaleString('en-IN') : '42,80,000'}
+                ₹ {stats?.totalPaid ? Number(stats.totalPaid).toLocaleString('en-IN') : '0'}
               </div>
               <span className="admin-stat-sub">Total Approved</span>
             </Link>
@@ -1551,11 +1551,11 @@ function Dashboard({ admin = false }) {
           <div className="admin-stats-grid-2" style={{ marginTop: '12px' }}>
             <Link to={`${prefix}/clients`} className="admin-stat-card-small">
               <small>Total Clients</small>
-              <strong>{stats?.totalClients ?? clientsList.length ?? '7'}</strong>
+              <strong>{stats?.totalClients ?? clientsList.length ?? 0}</strong>
             </Link>
             <Link to={`${prefix}/visits`} className="admin-stat-card-small">
               <small>Site Visits</small>
-              <strong>{stats?.totalVisits ?? visits.length ?? '8'}</strong>
+              <strong>{stats?.totalVisits ?? visits.length ?? 0}</strong>
             </Link>
           </div>
 
@@ -1595,18 +1595,24 @@ function Dashboard({ admin = false }) {
           </div>
 
           <div className="recent-activities-figma">
-            {displayActivities.map((act) => (
-              <div className="activity-item-figma" key={act.id}>
-                <span className="activity-icon-figma" style={{ background: act.bg, color: act.color }}>
-                  <act.Icon size={16} />
-                </span>
-                <div className="activity-details-figma">
-                  <b>{act.title}</b>
-                  <small>{act.subtitle}</small>
+            {displayActivities.length > 0 ? (
+              displayActivities.map((act) => (
+                <div className="activity-item-figma" key={act.id}>
+                  <span className="activity-icon-figma" style={{ background: act.bg, color: act.color }}>
+                    <act.Icon size={16} />
+                  </span>
+                  <div className="activity-details-figma">
+                    <b>{act.title}</b>
+                    <small>{act.subtitle}</small>
+                  </div>
+                  <time>{act.time}</time>
                 </div>
-                <time>{act.time}</time>
+              ))
+            ) : (
+              <div style={{ padding: '24px 16px', textAlign: 'center', color: '#6b7c77', fontSize: '13px', background: '#fff', borderRadius: '12px', border: '1px dashed #d1d5db' }}>
+                No recent activity yet. When clients, visits, or payments are recorded, they will appear here.
               </div>
-            ))}
+            )}
           </div>
         </>
       ) : (
@@ -1636,16 +1642,16 @@ function Dashboard({ admin = false }) {
           <div className="hero-stat-banner-figma">
             <div className="hero-stat-col">
               <span className="hero-stat-label">Total Clients</span>
-              <span className="hero-stat-value">{clientsList.length || 12}</span>
+              <span className="hero-stat-value">{clientsList.length}</span>
               <span className="hero-stat-subtag">Active Clients</span>
             </div>
             <div className="hero-stat-divider" />
             <div className="hero-stat-col">
               <span className="hero-stat-label">Total Commission</span>
               <span className="hero-stat-value">
-                {stats?.totalPaid ? `₹ ${Number(stats.totalPaid).toLocaleString('en-IN')}` : '₹ 8,50,000'}
+                ₹ {Number(partnerPaidTotal).toLocaleString('en-IN')}
               </span>
-              <span className="hero-stat-subtag">Total Visits: {visits.length || 18}</span>
+              <span className="hero-stat-subtag">Total Visits: {visits.length}</span>
             </div>
           </div>
 
@@ -1693,18 +1699,24 @@ function Dashboard({ admin = false }) {
           </div>
 
           <div className="recent-activities-figma">
-            {displayActivities.map((act) => (
-              <div className="activity-item-figma" key={act.id}>
-                <span className="activity-icon-figma" style={{ background: act.bg, color: act.color }}>
-                  <act.Icon size={16} />
-                </span>
-                <div className="activity-details-figma">
-                  <b>{act.title}</b>
-                  <small>{act.subtitle}</small>
+            {displayActivities.length > 0 ? (
+              displayActivities.map((act) => (
+                <div className="activity-item-figma" key={act.id}>
+                  <span className="activity-icon-figma" style={{ background: act.bg, color: act.color }}>
+                    <act.Icon size={16} />
+                  </span>
+                  <div className="activity-details-figma">
+                    <b>{act.title}</b>
+                    <small>{act.subtitle}</small>
+                  </div>
+                  <time>{act.time}</time>
                 </div>
-                <time>{act.time}</time>
+              ))
+            ) : (
+              <div style={{ padding: '24px 16px', textAlign: 'center', color: '#6b7c77', fontSize: '13px', background: '#fff', borderRadius: '12px', border: '1px dashed #d1d5db' }}>
+                No recent activity yet. When clients, visits, or payments are recorded, they will appear here.
               </div>
-            ))}
+            )}
           </div>
         </>
       )}
