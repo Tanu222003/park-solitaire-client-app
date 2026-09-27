@@ -1,3 +1,5 @@
+import { Capacitor } from "@capacitor/core";
+
 // Park Solitaire CRM - Resilient API Client with Live Backend & Smart Demo Engine
 
 export function getBaseUrl() {
@@ -13,6 +15,13 @@ export function getBaseUrl() {
       } else {
         return saved.trim().replace(/\/$/, "");
       }
+    }
+
+    // Capacitor Native Mobile App (Android / iOS): Always use production cloud backend
+    const isNative = (typeof window.Capacitor !== "undefined" && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) ||
+                     (Capacitor && typeof Capacitor.isNativePlatform === "function" && Capacitor.isNativePlatform());
+    if (isNative) {
+      return "https://park-solitaire-backend-production.up.railway.app/api";
     }
 
     if (host === "localhost" || host === "127.0.0.1") {
