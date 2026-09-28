@@ -75,17 +75,18 @@ export async function login(req, res, next) {
     // Allow login by email OR mobile phone / alternate phone (any formatting)
     let [rows] = await pool.query(
       `SELECT * FROM users 
-       WHERE email = ? 
+       WHERE TRIM(email) = ? 
+          OR email = ? 
           OR phone = ? 
           OR phone2 = ? 
           OR REPLACE(phone, ' ', '') = ? 
           OR (LENGTH(?) >= 10 AND RIGHT(REPLACE(REPLACE(phone, ' ', ''), '+91', ''), 10) = ?)
           OR (LENGTH(?) >= 10 AND RIGHT(REPLACE(REPLACE(phone2, ' ', ''), '+91', ''), 10) = ?)`,
-      [cleanIdentifier, cleanIdentifier, cleanIdentifier, cleanIdentifier.replace(/\s+/g, ''), last10, last10, last10, last10]
+      [cleanIdentifier, cleanIdentifier, cleanIdentifier, cleanIdentifier, cleanIdentifier.replace(/\s+/g, ''), last10, last10, last10, last10]
     );
 
-    if (rows.length === 0 && cleanIdentifier.toLowerCase() === 'admin') {
-      [rows] = await pool.query("SELECT * FROM users WHERE email = 'admin@parksolitaire.com'");
+    if (rows.length === 0 && (cleanIdentifier.toLowerCase() === 'admin' || cleanIdentifier.toLowerCase() === 'admin@parksolitaire.com')) {
+      [rows] = await pool.query("SELECT * FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1");
     }
 
     const user = rows[0];
@@ -182,17 +183,18 @@ export async function sendForgotPasswordOtp(req, res, next) {
 
     let [rows] = await pool.query(
       `SELECT * FROM users 
-       WHERE email = ? 
+       WHERE TRIM(email) = ? 
+          OR email = ? 
           OR phone = ? 
           OR phone2 = ? 
           OR REPLACE(phone, ' ', '') = ? 
           OR (LENGTH(?) >= 10 AND RIGHT(REPLACE(REPLACE(phone, ' ', ''), '+91', ''), 10) = ?)
           OR (LENGTH(?) >= 10 AND RIGHT(REPLACE(REPLACE(phone2, ' ', ''), '+91', ''), 10) = ?)`,
-      [cleanIdentifier, cleanIdentifier, cleanIdentifier, cleanIdentifier.replace(/\s+/g, ''), last10, last10, last10, last10]
+      [cleanIdentifier, cleanIdentifier, cleanIdentifier, cleanIdentifier, cleanIdentifier.replace(/\s+/g, ''), last10, last10, last10, last10]
     );
 
-    if (rows.length === 0 && cleanIdentifier.toLowerCase() === 'admin') {
-      [rows] = await pool.query("SELECT * FROM users WHERE email = 'admin@parksolitaire.com'");
+    if (rows.length === 0 && (cleanIdentifier.toLowerCase() === 'admin' || cleanIdentifier.toLowerCase() === 'admin@parksolitaire.com')) {
+      [rows] = await pool.query("SELECT * FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1");
     }
 
     if (role && rows.length > 1) {

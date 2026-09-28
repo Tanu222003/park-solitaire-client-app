@@ -370,7 +370,7 @@ function handleMockRequest(endpoint, options = {}) {
     const requestedRole = endpoint === "/auth/admin/login" ? "admin" : endpoint === "/auth/partner/login" ? "partner" : body.role;
 
     // Check admin credentials
-    if (email === "admin@parksolitaire.com" || email === "admin") {
+    if (email === "admin@parksolitaire.com" || email === "admin" || email === "sales@parksolitairelifespaces.com") {
       if (requestedRole === "partner") {
         const error = new Error("Access denied: Admin accounts must log in through the Admin Portal (/admin/login).");
         error.status = 403;
