@@ -867,8 +867,14 @@ function Shell({ children }) {
   const userStr = localStorage.getItem('user');
   let user = { name: 'User', role: 'partner', email: '' };
   try {
-    if (userStr) user = JSON.parse(userStr);
+    if (userStr && userStr !== 'undefined' && userStr !== 'null') {
+      const parsed = JSON.parse(userStr);
+      if (parsed && typeof parsed === 'object') user = parsed;
+    }
   } catch {}
+  if (!user || typeof user !== 'object') {
+    user = { name: 'User', role: 'partner', email: '' };
+  }
 
   const handleLogout = () => {
     const wasAdmin = user?.role === 'admin';
@@ -1428,8 +1434,14 @@ function Dashboard({ admin = false }) {
   const userStr = localStorage.getItem('user');
   let user = { name: admin ? 'Admin' : 'Partner', role: admin ? 'admin' : 'partner' };
   try {
-    if (userStr) user = JSON.parse(userStr);
+    if (userStr && userStr !== 'undefined' && userStr !== 'null') {
+      const parsed = JSON.parse(userStr);
+      if (parsed && typeof parsed === 'object') user = parsed;
+    }
   } catch {}
+  if (!user || typeof user !== 'object') {
+    user = { name: admin ? 'Admin' : 'Partner', role: admin ? 'admin' : 'partner' };
+  }
 
   const [stats, setStats] = useState(null);
   const [visits, setVisits] = useState([]);
