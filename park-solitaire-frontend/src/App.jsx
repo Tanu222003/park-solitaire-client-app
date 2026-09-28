@@ -407,6 +407,11 @@ function Login({ defaultRole = 'partner' }) {
     try {
       const res = await api.login({ email: email.trim(), password, role });
 
+      if (!res || !res.user || !res.token) {
+        setError('Login failed: Invalid server response. Please try again.');
+        return;
+      }
+
       if (role === 'admin' && res.user.role !== 'admin') {
         setError('Access denied: Channel Partner credentials cannot be used for Admin login.');
         return;
@@ -564,6 +569,10 @@ function Register() {
         phone: cleanPhone,
         phone2: form.phone2 && form.phone2.trim() ? form.phone2.replace(/\D/g, '') : null
       });
+      if (!res || !res.token || !res.user) {
+        setError('Registration failed: Invalid server response. Please try again.');
+        return;
+      }
       localStorage.setItem('token', res.token);
       localStorage.setItem('user', JSON.stringify(res.user));
       navigate('/partner/dashboard');

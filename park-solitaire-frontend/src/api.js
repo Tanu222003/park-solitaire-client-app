@@ -907,6 +907,7 @@ async function request(endpoint, options = {}) {
       console.log(`[Cloud MySQL API] ${method} ${endpoint} -> 200 OK`, data);
     }
 
+    return data;
   } catch (err) {
     // If local dev server (localhost:5001) is down or unreachable, automatically failover to live Railway cloud backend!
     const isLocalUrl = baseUrl.includes("localhost:5001") || baseUrl.includes("127.0.0.1:5001");
