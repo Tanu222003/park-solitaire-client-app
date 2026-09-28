@@ -907,9 +907,36 @@ async function request(endpoint, options = {}) {
       console.log(`[Cloud MySQL API] ${method} ${endpoint} -> 200 OK`, data);
     }
 
-    return data;
   } catch (err) {
-    // Log failure and propagate genuine error without silently diverting to localStorage mock store
+    // If local dev server (localhost:5001) is down or unreachable, automatically failover to live Railway cloud backend!
+    const isLocalUrl = baseUrl.includes("localhost:5001") || baseUrl.includes("127.0.0.1:5001");
+    if (isLocalUrl && !options._retried) {
+      const fallbackUrl = "https://park-solitaire-backend-production.up.railway.app/api";
+      console.warn(`Local backend at ${baseUrl} failed (${err.message}). Retrying against live Railway cloud backend...`);
+      try {
+        const fallbackResponse = await fetch(`${fallbackUrl}${endpoint}`, {
+          ...options,
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            ...(options.headers || {})
+          }
+        });
+        let fbData;
+        try { fbData = await fallbackResponse.json(); } catch { fbData = {}; }
+        if (!fallbackResponse.ok) {
+          const fbErr = new Error(fbData.message || `Request failed with status ${fallbackResponse.status}`);
+          fbErr.status = fallbackResponse.status;
+          fbErr.data = fbData;
+          throw fbErr;
+        }
+        return fbData;
+      } catch (fbErr) {
+        console.warn(`Cloud fallback error:`, fbErr.message);
+        throw fbErr;
+      }
+    }
+    // Log failure and propagate genuine error
     console.warn(`API ${endpoint} failed against ${baseUrl}:`, err.message);
     throw err;
   }

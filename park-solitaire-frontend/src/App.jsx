@@ -425,7 +425,12 @@ function Login({ defaultRole = 'partner' }) {
         navigate('/partner/dashboard');
       }
     } catch (err) {
-      setError(err.message || 'Invalid email or password');
+      const msg = err.message || '';
+      if (msg.toLowerCase().includes('failed to fetch')) {
+        setError('Unable to reach server. Please check your internet connection or verify the backend is running.');
+      } else {
+        setError(msg || 'Invalid email or password');
+      }
     } finally {
       setLoading(false);
     }
