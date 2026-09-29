@@ -26,6 +26,10 @@ const app = express();
 const defaultAllowedOrigins = [
   'https://park-solitaire-clientapp.vercel.app',
   'https://park-solitaire-client-app-production.up.railway.app',
+  'https://localhost',
+  'capacitor://localhost',
+  'ionic://localhost',
+  'http://localhost',
   'http://localhost:5173',
   'http://localhost:3000',
   'http://127.0.0.1:5173',
@@ -54,8 +58,8 @@ const corsOptions = {
       return callback(null, true);
     }
 
-    // 4. Allow any local development port
-    if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+    // 4. Allow any local development port or mobile WebView scheme (Android/iOS)
+    if (/^(https?|capacitor|ionic):\/\/(localhost|127\.0\.0\.1|10\.0\.2\.2)(:\d+)?$/.test(origin)) {
       return callback(null, true);
     }
 

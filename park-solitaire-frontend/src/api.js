@@ -18,7 +18,11 @@ export function getBaseUrl() {
     }
 
     // Capacitor Native Mobile App (Android / iOS): Always use production cloud backend
-    const isNative = (typeof window.Capacitor !== "undefined" && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) ||
+    const isCapacitorOrigin = window.location.protocol === "capacitor:" || 
+                              window.location.protocol === "ionic:" ||
+                              (window.location.protocol === "https:" && host === "localhost" && !window.location.port);
+    const isNative = isCapacitorOrigin ||
+                     (typeof window.Capacitor !== "undefined" && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) ||
                      (Capacitor && typeof Capacitor.isNativePlatform === "function" && Capacitor.isNativePlatform());
     if (isNative) {
       return "https://park-solitaire-backend-production.up.railway.app/api";
@@ -937,6 +941,42 @@ async function request(endpoint, options = {}) {
         throw fbErr;
       }
     }
+    // If cloud backend failed from an Android emulator, attempt fallback to local host (10.0.2.2:5001)
+    const isCloudUrl = baseUrl.includes("railway.app");
+    if (isCloudUrl && !options._retried) {
+      const isCapacitorOrigin = typeof window !== "undefined" && (
+        window.location.protocol === "capacitor:" || 
+        window.location.protocol === "ionic:" ||
+        (window.location.protocol === "https:" && window.location.hostname === "localhost" && !window.location.port)
+      );
+      if (isCapacitorOrigin) {
+        const emulatorUrl = "http://10.0.2.2:5001/api";
+        console.warn(`Cloud backend at ${baseUrl} failed (${err.message}). Trying Android emulator gateway (${emulatorUrl})...`);
+        try {
+          const emuResponse = await fetch(`${emulatorUrl}${endpoint}`, {
+            ...options,
+            _retried: true,
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              ...(options.headers || {})
+            }
+          });
+          let emuData;
+          try { emuData = await emuResponse.json(); } catch { emuData = {}; }
+          if (!emuResponse.ok) {
+            const emuErr = new Error(emuData.message || `Request failed with status ${emuResponse.status}`);
+            emuErr.status = emuResponse.status;
+            emuErr.data = emuData;
+            throw emuErr;
+          }
+          return emuData;
+        } catch (emuErr) {
+          console.warn(`Emulator fallback failed:`, emuErr.message);
+        }
+      }
+    }
+
     // Log failure and propagate genuine error
     console.warn(`API ${endpoint} failed against ${baseUrl}:`, err.message);
     throw err;
