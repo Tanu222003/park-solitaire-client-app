@@ -480,6 +480,33 @@ function handleMockRequest(endpoint, options = {}) {
     };
   }
 
+  // POST /auth/request-delete-account
+  if (endpoint === "/auth/request-delete-account") {
+    const identifier = (body.identifier || "").trim().toLowerCase();
+    const idx = store.users.findIndex(u => 
+      u.email.toLowerCase() === identifier || 
+      (u.phone && u.phone.includes(identifier))
+    );
+    if (idx !== -1 && store.users[idx].role !== "admin") {
+      store.users.splice(idx, 1);
+      saveDemoStore(store);
+    }
+    return {
+      success: true,
+      message: "Your request for account and associated data deletion has been received and processed successfully."
+    };
+  }
+
+  // DELETE /auth/account
+  if (endpoint === "/auth/account" && method === "DELETE") {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    return {
+      success: true,
+      message: "Your account and associated personal data have been permanently deleted."
+    };
+  }
+
   // Current authenticated user context
   let currentUser = { id: 2, name: 'Rahul Sharma', role: 'partner', firm_name: 'Shree Realty Advisory', phone: '+91 98200 12345', email: 'cp@realty.com' };
   try {
@@ -856,7 +883,11 @@ async function request(endpoint, options = {}) {
   }
 
   // Check auth requirement for protected endpoints
-  const isPublic = endpoint.startsWith("/auth/login") || endpoint.startsWith("/auth/register") || endpoint.startsWith("/auth/forgot-password") || endpoint === "/health";
+  const isPublic = endpoint.startsWith("/auth/login") || 
+                   endpoint.startsWith("/auth/register") || 
+                   endpoint.startsWith("/auth/forgot-password") || 
+                   endpoint.startsWith("/auth/request-delete-account") || 
+                   endpoint === "/health";
   if (!token && !isPublic) {
     if (typeof window !== "undefined" && window.location && !window.location.pathname.includes("/login") && !window.location.pathname.includes("/forgot-password")) {
       const isAdmin = window.location.pathname.startsWith("/admin");
@@ -1096,5 +1127,16 @@ export const api = {
     request("/auth/forgot-password/reset", {
       method: "POST",
       body: JSON.stringify(data)
+    }),
+
+  requestDeleteAccount: (data) =>
+    request("/auth/request-delete-account", {
+      method: "POST",
+      body: JSON.stringify(data)
+    }),
+
+  deleteOwnAccount: () =>
+    request("/auth/account", {
+      method: "DELETE"
     })
 };

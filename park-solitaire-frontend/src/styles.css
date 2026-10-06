@@ -4567,4 +4567,132 @@ input:focus, select:focus, textarea:focus {
   border-color: #075c4d;
 }
 
+/* ========================================================= */
+/* Account Deletion Page (Google Play Compliance & Privacy)  */
+/* ========================================================= */
+.deletion-page-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 16px;
+  background: linear-gradient(135deg, #f0fdf4 0%, #f8fafc 50%, #f1f5f9 100%);
+  box-sizing: border-box;
+}
+
+.deletion-card {
+  width: 100%;
+  max-width: 680px;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e2e8f0;
+  padding: 32px;
+  box-sizing: border-box;
+}
+
+.deletion-brand-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.deletion-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 16px 0 6px 0;
+  letter-spacing: -0.3px;
+}
+
+.deletion-subtitle {
+  font-size: 13.5px;
+  color: #64748b;
+  margin: 0;
+}
+
+.deletion-policy-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin-bottom: 22px;
+}
+
+.deletion-policy-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14.5px;
+  color: #0f172a;
+}
+
+.deletion-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+@media (max-width: 640px) {
+  .deletion-grid {
+    grid-template-columns: 1fr;
+  }
+  .deletion-card {
+    padding: 20px 16px;
+  }
+  .deletion-title {
+    font-size: 20px;
+  }
+}
+
+.deletion-col {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.deletion-col-delete {
+  border-left: 3px solid #dc2626;
+}
+
+.deletion-col-retain {
+  border-left: 3px solid #d97706;
+}
+
+.deletion-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.deletion-list li {
+  margin-bottom: 5px;
+}
+
+.deletion-form {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 22px;
+}
+
+.deletion-success-box {
+  text-align: center;
+  padding: 30px 20px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  margin-bottom: 22px;
+}
+
+.deletion-footer-contact {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 18px;
+  margin-top: 10px;
+}
+
 

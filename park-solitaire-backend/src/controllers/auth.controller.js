@@ -363,3 +363,123 @@ export async function resetForgotPassword(req, res, next) {
     next(err);
   }
 }
+
+export async function requestDeleteAccount(req, res, next) {
+  try {
+    const { identifier, reason, confirm } = req.body || {};
+    if (!identifier || !String(identifier).trim()) {
+      return res.status(400).json({ message: 'Email address or mobile number is required' });
+    }
+
+    if (!confirm) {
+      return res.status(400).json({ message: 'Please confirm that you want to delete your account and associated data' });
+    }
+
+    const cleanIdentifier = String(identifier).trim();
+    const digitsOnly = cleanIdentifier.replace(/\D/g, '');
+    const last10 = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
+
+    // Lookup user by email or phone
+    const [rows] = await pool.query(
+      `SELECT * FROM users 
+       WHERE TRIM(email) = ? 
+          OR email = ? 
+          OR phone = ? 
+          OR phone2 = ? 
+          OR REPLACE(phone, ' ', '') = ? 
+          OR (LENGTH(?) >= 10 AND RIGHT(REPLACE(REPLACE(phone, ' ', ''), '+91', ''), 10) = ?)
+          OR (LENGTH(?) >= 10 AND RIGHT(REPLACE(REPLACE(phone2, ' ', ''), '+91', ''), 10) = ?)`,
+      [cleanIdentifier, cleanIdentifier, cleanIdentifier, cleanIdentifier, cleanIdentifier.replace(/\s+/g, ''), last10, last10, last10, last10]
+    );
+
+    if (rows.length === 0) {
+      // Standard message to avoid account enumeration
+      return res.json({
+        success: true,
+        message: 'Your request for account and associated data deletion has been received. If an account is associated with this identifier, all personal data, client dossiers, and activity logs will be permanently deleted within 48-72 hours.'
+      });
+    }
+
+    const user = rows[0];
+
+    // Master administrator cannot be deleted via public web request
+    if (user.role === 'admin') {
+      return res.status(403).json({ message: 'Primary administrator accounts cannot be deleted via this form. Please contact enterprise management.' });
+    }
+
+    // Check if user has associated financial bills
+    const [bills] = await pool.query('SELECT COUNT(*) as c FROM bills WHERE partner_id = ?', [user.id]);
+    const hasBills = bills[0]?.c > 0;
+
+    if (hasBills) {
+      // In accordance with statutory financial compliance, anonymize personal profile and redact contact details
+      await pool.query(
+        `UPDATE users 
+         SET status = 'inactive', 
+             phone = NULL, 
+             phone2 = NULL, 
+             contact_name = NULL, 
+             name = 'Deleted Channel Partner' 
+         WHERE id = ?`,
+        [user.id]
+      );
+      // Delete non-financial associated records
+      await pool.query('DELETE FROM visits WHERE partner_id = ?', [user.id]);
+      await pool.query('DELETE FROM complaints WHERE partner_id = ?', [user.id]);
+      await pool.query('DELETE FROM password_reset_otps WHERE user_id = ?', [user.id]);
+    } else {
+      // Safe to permanently delete entire record (cascades to clients, visits, complaints, etc.)
+      await pool.query('DELETE FROM users WHERE id = ?', [user.id]);
+    }
+
+    res.json({
+      success: true,
+      message: 'Your account and all associated CRM data have been permanently deleted.'
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function deleteOwnAccount(req, res, next) {
+  try {
+    const userId = req.user.id;
+    const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'User account not found' });
+    }
+
+    const user = rows[0];
+    if (user.role === 'admin') {
+      return res.status(403).json({ message: 'Primary administrator account cannot be deleted.' });
+    }
+
+    const [bills] = await pool.query('SELECT COUNT(*) as c FROM bills WHERE partner_id = ?', [userId]);
+    const hasBills = bills[0]?.c > 0;
+
+    if (hasBills) {
+      await pool.query(
+        `UPDATE users 
+         SET status = 'inactive', 
+             phone = NULL, 
+             phone2 = NULL, 
+             contact_name = NULL, 
+             name = 'Deleted Channel Partner' 
+         WHERE id = ?`,
+        [userId]
+      );
+      await pool.query('DELETE FROM visits WHERE partner_id = ?', [userId]);
+      await pool.query('DELETE FROM complaints WHERE partner_id = ?', [userId]);
+      await pool.query('DELETE FROM password_reset_otps WHERE user_id = ?', [userId]);
+    } else {
+      await pool.query('DELETE FROM users WHERE id = ?', [userId]);
+    }
+
+    res.json({
+      success: true,
+      message: 'Your account and all associated personal records have been permanently deleted.'
+    });
+  } catch (err) {
+    next(err);
+  }
+}

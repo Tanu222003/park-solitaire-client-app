@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Request Account & Data Deletion | Park Solitaire CRM</title>
+  <meta name="description" content="Official Park Solitaire Channel Partner CRM account and data deletion request portal. Compliant with Google Play Data Safety policies.">
+  <link rel="icon" type="image/png" href="/logo-emblem.png">
+  <style>
+    :root {
+      --primary: #075c4d;
+      --primary-dark: #054439;
+      --danger: #dc2626;
+      --danger-dark: #b91c1c;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --border: #e2e8f0;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    body {
+      background: linear-gradient(135deg, #f0fdf4 0%, #f8fafc 50%, #f1f5f9 100%);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 32px 16px;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      width: 100%;
+      max-width: 680px;
+      background: var(--card-bg);
+      border-radius: 14px;
+      padding: 36px 32px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+      border: 1px solid var(--border);
+    }
+    .brand-header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .brand-logo {
+      max-height: 52px;
+      margin-bottom: 12px;
+    }
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 6px;
+      letter-spacing: -0.3px;
+    }
+    .subtitle {
+      font-size: 13.5px;
+      color: var(--text-muted);
+    }
+    .back-nav {
+      margin-bottom: 20px;
+    }
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--primary);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .back-link:hover {
+      text-decoration: underline;
+    }
+    .info-box {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin-bottom: 24px;
+    }
+    .info-header {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: #0f172a;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .info-box p {
+      font-size: 13px;
+      color: #334155;
+      margin-bottom: 12px;
+    }
+    .policy-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 10px;
+    }
+    @media (max-width: 620px) {
+      .policy-grid {
+        grid-template-columns: 1fr;
+      }
+      .container {
+        padding: 24px 18px;
+      }
+      h1 {
+        font-size: 20px;
+      }
+    }
+    .policy-card {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .policy-card-delete {
+      border-left: 3px solid var(--danger);
+    }
+    .policy-card-retain {
+      border-left: 3px solid #d97706;
+    }
+    .policy-card h4 {
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+    .policy-card-delete h4 {
+      color: var(--danger);
+    }
+    .policy-card-retain h4 {
+      color: #d97706;
+    }
+    .policy-card ul {
+      padding-left: 18px;
+      font-size: 12px;
+      color: #475569;
+    }
+    .policy-card ul li {
+      margin-bottom: 4px;
+    }
+    .policy-card p {
+      font-size: 12px;
+      color: #475569;
+      margin: 0;
+      line-height: 1.5;
+    }
+    .form-card {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 22px;
+      margin-bottom: 22px;
+    }
+    .form-card h3 {
+      font-size: 15px;
+      color: #1e293b;
+      margin-bottom: 14px;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #334155;
+      margin-bottom: 6px;
+    }
+    input[type="text"], input[type="email"], select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 14px;
+      margin-bottom: 14px;
+      background: #ffffff;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(7, 92, 77, 0.15);
+    }
+    .warning-check {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 13px;
+      color: #991b1b;
+      cursor: pointer;
+    }
+    .warning-check input {
+      margin-top: 3px;
+      cursor: pointer;
+    }
+    .btn-submit {
+      width: 100%;
+      padding: 12px 20px;
+      background: var(--danger);
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-submit:hover {
+      background: var(--danger-dark);
+    }
+    .btn-submit:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+    }
+    .alert-box {
+      padding: 12px 14px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .alert-error {
+      background: #fef2f2;
+      border: 1px solid #fca5a5;
+      color: #991b1b;
+    }
+    .alert-success {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+      text-align: center;
+      padding: 24px 16px;
+    }
+    .alert-success h3 {
+      color: #166534;
+      font-size: 18px;
+      margin-bottom: 8px;
+    }
+    .alert-success p {
+      font-size: 13.5px;
+      color: #14532d;
+      margin-bottom: 16px;
+    }
+    .support-footer {
+      border-top: 1px solid var(--border);
+      padding-top: 18px;
+      margin-top: 10px;
+    }
+    .support-footer h4 {
+      font-size: 12px;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .support-footer p {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .contact-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      font-size: 12px;
+    }
+    .contact-links a {
+      color: var(--primary);
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="brand-header">
+      <img src="/logo.png" alt="Park Solitaire Lifespaces LLP" class="brand-logo">
+      <h1>Request Account & Data Deletion</h1>
+      <p class="subtitle">Park Solitaire Channel Partner CRM • User Privacy & Compliance Portal</p>
+    </div>
+
+    <div class="back-nav">
+      <a href="/login" class="back-link">← Return to Login</a>
+    </div>
+
+    <!-- Policy Disclosures (Google Play Policy Compliant) -->
+    <div class="info-box">
+      <div class="info-header">🛡️ What happens when you delete your account?</div>
+      <p>
+        Under Google Play Developer Policy and data protection guidelines, you have the right to request permanent deletion of your Park Solitaire Channel Partner account and all associated personal CRM records.
+      </p>
+
+      <div class="policy-grid">
+        <div class="policy-card policy-card-delete">
+          <h4>🗑️ Data Permanently Deleted</h4>
+          <ul>
+            <li>Profile details (Full name, firm name, contact person)</li>
+            <li>Login credentials (Email, password hash, tokens)</li>
+            <li>Mobile and alternate telephone numbers</li>
+            <li>Registered client dossiers & prospect leads</li>
+            <li>Site visit appointments, logs, and visit notes</li>
+            <li>Support tickets and complaint conversation history</li>
+          </ul>
+        </div>
+
+        <div class="policy-card policy-card-retain">
+          <h4>⚖️ Regulatory Retention Disclosure</h4>
+          <p>
+            In compliance with statutory requirements under the Indian Income Tax Act, GST regulations, and RERA compliance, finalized financial commission vouchers, invoice tax records, and paid brokerage billing ledgers may be retained in an anonymized, audited state for the legally mandated compliance period (up to 7 years) solely for tax and accounting audits.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div id="errorAlert" class="alert-box alert-error"></div>
+    <div id="successAlert" class="alert-box alert-success"></div>
+
+    <div id="formSection" class="form-card">
+      <h3>Submit Account & Data Deletion Request</h3>
+      <form id="deletionForm">
+        <label for="identifier">Registered Email Address or Mobile Number *</label>
+        <input type="text" id="identifier" required placeholder="e.g. partner@example.com or 9820012345">
+
+        <label for="reason">Reason for Deletion (Optional)</label>
+        <select id="reason">
+          <option value="">Select a reason (optional)</option>
+          <option value="No longer operating as a Channel Partner">No longer operating as a Channel Partner</option>
+          <option value="Moving to another real estate advisory firm">Moving to another real estate advisory firm</option>
+          <option value="Privacy and data removal preference">Privacy and data removal preference</option>
+          <option value="Switching phone number / registered email">Switching phone number / registered email</option>
+          <option value="Other">Other</option>
+        </select>
+
+        <label class="warning-check">
+          <input type="checkbox" id="confirmCheck" required>
+          <span>
+            <strong>I understand this action is permanent.</strong> Deleting my account will permanently remove my Channel Partner profile, associated client dossiers, and historical site visit records from Park Solitaire CRM.
+          </span>
+        </label>
+
+        <button type="submit" id="submitBtn" class="btn-submit">Delete My Account & Associated Data</button>
+      </form>
+    </div>
+
+    <div class="support-footer">
+      <h4>Enterprise Data Compliance & Privacy Contact</h4>
+      <p>Need assistance or have specific data inquiries? You may also reach our compliance team directly:</p>
+      <div class="contact-links">
+        <span>📧 <a href="mailto:sales@parksolitairelifespaces.com">sales@parksolitairelifespaces.com</a></span>
+        <span>📞 <a href="tel:+919820012345">+91 98200 12345</a></span>
+        <span>📍 Mumbai, Maharashtra, India</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('deletionForm');
+    const identifierInput = document.getElementById('identifier');
+    const reasonSelect = document.getElementById('reason');
+    const confirmCheck = document.getElementById('confirmCheck');
+    const submitBtn = document.getElementById('submitBtn');
+    const errorAlert = document.getElementById('errorAlert');
+    const successAlert = document.getElementById('successAlert');
+    const formSection = document.getElementById('formSection');
+
+    // Pre-fill if user session exists in localStorage
+    try {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        const u = JSON.parse(userStr);
+        if (u.email) identifierInput.value = u.email;
+        else if (u.phone) identifierInput.value = u.phone;
+      }
+    } catch (e) {}
+
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      errorAlert.style.display = 'none';
+      errorAlert.textContent = '';
+
+      const identifier = identifierInput.value.trim();
+      if (!identifier) {
+        errorAlert.textContent = 'Please enter your registered email address or mobile number.';
+        errorAlert.style.display = 'block';
+        return;
+      }
+
+      if (!confirmCheck.checked) {
+        errorAlert.textContent = 'Please confirm that you understand this action will permanently delete your account.';
+        errorAlert.style.display = 'block';
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Processing Deletion...';
+
+      try {
+        const response = await fetch('https://park-solitaire-backend-production.up.railway.app/api/auth/request-delete-account', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            identifier: identifier,
+            reason: reasonSelect.value || 'Not specified',
+            confirm: true
+          })
+        });
+
+        let data = {};
+        try { data = await response.json(); } catch(err) {}
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Server returned an error processing your deletion request.');
+        }
+
+        // Clear local credentials if current user matches
+        try {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        } catch(e) {}
+
+        formSection.style.display = 'none';
+        successAlert.innerHTML = `
+          <h3>Deletion Request Received</h3>
+          <p>${data.message || 'Your account and associated personal CRM data have been permanently deleted.'}</p>
+          <a href="/login" style="display:inline-block; padding:10px 20px; background:#075c4d; color:#fff; text-decoration:none; border-radius:8px; font-weight:600; font-size:14px;">Return to Login</a>
+        `;
+        successAlert.style.display = 'block';
+      } catch (err) {
+        errorAlert.textContent = err.message || 'Unable to connect to the server. Please email sales@parksolitairelifespaces.com directly.';
+        errorAlert.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Delete My Account & Associated Data';
+      }
+    });
+  </script>
+</body>
+</html>

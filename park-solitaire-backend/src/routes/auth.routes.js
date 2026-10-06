@@ -7,7 +7,9 @@ import {
   getAdminInfo,
   sendForgotPasswordOtp,
   verifyForgotPasswordOtp,
-  resetForgotPassword
+  resetForgotPassword,
+  requestDeleteAccount,
+  deleteOwnAccount
 } from '../controllers/auth.controller.js';
 import { verifyToken } from '../middleware/auth.js';
 
@@ -25,6 +27,10 @@ router.post('/partner/login', (req, res, next) => {
   req.body.role = 'partner';
   return login(req, res, next);
 });
+
+// Account Deletion routes (Google Play Compliance & User Privacy)
+router.post('/request-delete-account', requestDeleteAccount);
+router.delete('/account', verifyToken, deleteOwnAccount);
 
 // Forgot Password routes with OTP
 router.post('/forgot-password/send-otp', sendForgotPasswordOtp);

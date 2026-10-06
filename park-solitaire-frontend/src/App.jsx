@@ -6,7 +6,7 @@ import {
   LogIn, LogOut, Menu, MessageSquare, MoreHorizontal, Plus, Search,
   Send, Settings, Users, X, Phone, Mail, MapPin, Building, Tag,
   UserCheck, ShieldAlert, Clock, FileText, Landmark, CreditCard,
-  BarChart2, TrendingUp
+  BarChart2, TrendingUp, Trash2, AlertTriangle, ShieldCheck, Info, ExternalLink
 } from 'lucide-react';
 import { api, getServerUrl, setServerUrl } from './api';
 
@@ -317,6 +317,26 @@ function UserDetailsModal({ user: initialUser, onClose }) {
               </a>
             )}
           </div>
+
+          {isCP && (
+            <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #f1f5f9', textAlign: 'center' }}>
+              <Link
+                to="/delete-account"
+                onClick={onClose}
+                style={{
+                  fontSize: '11.5px',
+                  color: '#94a3b8',
+                  textDecoration: 'underline',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <Trash2 size={12} />
+                <span>Request Account & Data Deletion</span>
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -522,6 +542,12 @@ function Login({ defaultRole = 'partner' }) {
           </button>
         </div>
       )}
+
+      <div style={{ marginTop: '16px', textAlign: 'center', fontSize: '12px' }}>
+        <Link to="/delete-account" style={{ color: '#64748b', textDecoration: 'underline' }}>
+          Request Account & Data Deletion
+        </Link>
+      </div>
     </Auth>
   );
 }
@@ -662,7 +688,281 @@ function Register() {
       <div className="foot">
         Already have an account? <Link to="/login">Login</Link>
       </div>
+
+      <div style={{ marginTop: '14px', textAlign: 'center', fontSize: '11.5px', color: '#64748b' }}>
+        Looking to remove your account?{' '}
+        <Link to="/delete-account" style={{ color: '#075c4d', fontWeight: 600, textDecoration: 'underline' }}>
+          Request Account Deletion
+        </Link>
+      </div>
     </Auth>
+  );
+}
+
+function DeleteAccount() {
+  const navigate = useNavigate();
+  const [identifier, setIdentifier] = useState('');
+  const [reason, setReason] = useState('');
+  const [confirmCheck, setConfirmCheck] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const u = JSON.parse(userStr);
+        setCurrentUser(u);
+        if (u.email) setIdentifier(u.email);
+        else if (u.phone) setIdentifier(u.phone);
+      } catch {}
+    }
+  }, []);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    if (!identifier.trim()) {
+      setErrorMsg('Please enter your registered email address or mobile number.');
+      return;
+    }
+
+    if (!confirmCheck) {
+      setErrorMsg('Please confirm that you understand this action will permanently delete your account and CRM data.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      if (currentUser && currentUser.role === 'partner') {
+        await api.deleteOwnAccount();
+        setSuccessMsg('Your account and associated personal data have been permanently deleted from Park Solitaire CRM.');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setCurrentUser(null);
+      } else {
+        const res = await api.requestDeleteAccount({
+          identifier: identifier.trim(),
+          reason: reason || 'Not specified',
+          confirm: true
+        });
+        setSuccessMsg(res.message || 'Your account and data deletion request has been processed successfully.');
+      }
+    } catch (err) {
+      setErrorMsg(err.message || 'Unable to process deletion request. Please contact enterprise support directly.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="deletion-page-wrapper">
+      <div className="deletion-card">
+        <div className="deletion-brand-header">
+          <Logo full large />
+          <h1 className="deletion-title">Request Account & Data Deletion</h1>
+          <p className="deletion-subtitle">
+            Park Solitaire Channel Partner CRM • User Privacy & Compliance Portal
+          </p>
+        </div>
+
+        <div style={{ marginBottom: '16px' }}>
+          <button
+            type="button"
+            className="linkbtn"
+            onClick={() => navigate(-1)}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#075c4d' }}
+          >
+            <ArrowLeft size={15} /> Back
+          </button>
+        </div>
+
+        <div className="deletion-policy-box">
+          <div className="deletion-policy-header">
+            <ShieldCheck size={18} style={{ color: '#075c4d' }} />
+            <strong>What happens when you delete your account?</strong>
+          </div>
+          <p style={{ margin: '8px 0 12px 0', fontSize: '13px', lineHeight: 1.5, color: '#334155' }}>
+            Under the Google Play Developer Policy and global data protection guidelines, you have the right to request the permanent deletion of your Park Solitaire Channel Partner account and all associated personal records.
+          </p>
+
+          <div className="deletion-grid">
+            <div className="deletion-col deletion-col-delete">
+              <strong style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#dc2626', fontSize: '13px', marginBottom: '8px' }}>
+                <Trash2 size={15} /> Data That Will Be Permanently Deleted:
+              </strong>
+              <ul className="deletion-list">
+                <li>Your profile details (Full name, firm name, contact person)</li>
+                <li>Login credentials (Email address, password hash, session tokens)</li>
+                <li>Phone numbers and alternative contact records</li>
+                <li>Client lead dossiers and prospect records created under your account</li>
+                <li>Upcoming & historical site visit appointments and logs</li>
+                <li>Customer support tickets and complaint conversation history</li>
+              </ul>
+            </div>
+
+            <div className="deletion-col deletion-col-retain">
+              <strong style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#d97706', fontSize: '13px', marginBottom: '8px' }}>
+                <Info size={15} /> Regulatory Retention Disclosure:
+              </strong>
+              <p style={{ fontSize: '12px', lineHeight: 1.5, color: '#475569', margin: 0 }}>
+                In compliance with statutory requirements under the Indian Income Tax Act, GST regulations, and RERA compliance, finalized financial commission vouchers, invoice tax records, and paid brokerage billing ledgers may be retained in an anonymized, audited state for the legally mandated compliance period (up to 7 years) solely for tax and accounting audits.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {errorMsg && (
+          <div className="err-msg" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertTriangle size={16} />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
+        {successMsg ? (
+          <div className="deletion-success-box">
+            <CheckCircle2 size={36} style={{ color: '#16a34a', marginBottom: '12px' }} />
+            <h3 style={{ margin: '0 0 8px 0', color: '#166534', fontSize: '18px' }}>Deletion Request Received</h3>
+            <p style={{ fontSize: '13.5px', color: '#14532d', lineHeight: 1.5, margin: '0 0 16px 0' }}>
+              {successMsg}
+            </p>
+            <p style={{ fontSize: '12.5px', color: '#475569', margin: '0 0 20px 0' }}>
+              A confirmation record has been logged. If you ever wish to rejoin Park Solitaire as an authorized Channel Partner, you can register anew.
+            </p>
+            <Link to="/login" className="primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '8px', textDecoration: 'none', color: '#fff', fontWeight: 600 }}>
+              <LogIn size={16} /> Return to Login
+            </Link>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="deletion-form">
+            <h3 style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#1e293b' }}>
+              Submit Account & Data Deletion Request
+            </h3>
+
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+              Registered Email or Mobile Number *
+            </label>
+            <input
+              type="text"
+              required
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="e.g. partner@example.com or 9820012345"
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                fontSize: '14px',
+                marginBottom: '14px',
+                boxSizing: 'border-box'
+              }}
+            />
+
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: '#334155', marginBottom: '6px' }}>
+              Reason for Deletion <span style={{ fontWeight: 400, color: '#64748b' }}>(Optional)</span>
+            </label>
+            <select
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                fontSize: '13.5px',
+                marginBottom: '16px',
+                background: '#fff',
+                boxSizing: 'border-box'
+              }}
+            >
+              <option value="">Select a reason (optional)</option>
+              <option value="No longer operating as a Channel Partner">No longer operating as a Channel Partner</option>
+              <option value="Moving to another real estate advisory firm">Moving to another real estate advisory firm</option>
+              <option value="Privacy and data removal preference">Privacy and data removal preference</option>
+              <option value="Switching phone number / registered email">Switching phone number / registered email</option>
+              <option value="Other">Other</option>
+            </select>
+
+            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '8px', padding: '12px 14px', marginBottom: '18px' }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '13px', color: '#991b1b', cursor: 'pointer', lineHeight: 1.4 }}>
+                <input
+                  type="checkbox"
+                  required
+                  checked={confirmCheck}
+                  onChange={(e) => setConfirmCheck(e.target.checked)}
+                  style={{ marginTop: '3px', cursor: 'pointer' }}
+                />
+                <span>
+                  <strong>I understand this action is permanent.</strong> Deleting my account will remove my Channel Partner profile, associated client dossiers, and historical site visit records from Park Solitaire CRM.
+                </span>
+              </label>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <button
+                type="submit"
+                disabled={loading || !confirmCheck}
+                style={{
+                  flex: 1,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '12px 20px',
+                  background: loading || !confirmCheck ? '#94a3b8' : '#dc2626',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: loading || !confirmCheck ? 'not-allowed' : 'pointer',
+                  transition: 'background 0.2s'
+                }}
+              >
+                <Trash2 size={16} />
+                {loading ? 'Processing Deletion...' : 'Delete My Account & Associated Data'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                style={{
+                  padding: '12px 18px',
+                  background: '#f1f5f9',
+                  color: '#475569',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '8px',
+                  fontWeight: 600,
+                  fontSize: '14px',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+
+        <div className="deletion-footer-contact">
+          <h4 style={{ margin: '0 0 6px 0', fontSize: '12.5px', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Enterprise Data Compliance & Privacy Contact
+          </h4>
+          <p style={{ margin: '0 0 6px 0', fontSize: '12px', color: '#64748b', lineHeight: 1.5 }}>
+            Need assistance or have specific data inquiries? You may also reach our data compliance team directly:
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', fontSize: '12px', color: '#334155' }}>
+            <span>📧 <a href="mailto:sales@parksolitairelifespaces.com" style={{ color: '#075c4d', textDecoration: 'underline' }}>sales@parksolitairelifespaces.com</a></span>
+            <span>📞 <a href="tel:+919820012345" style={{ color: '#075c4d', textDecoration: 'underline' }}>+91 98200 12345</a></span>
+            <span>📍 Mumbai, Maharashtra, India</span>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -770,6 +1070,26 @@ function Drawer({ isOpen, onClose, user, onLogout }) {
         </nav>
 
         <div className="drawer-footer">
+          <Link
+            to="/delete-account"
+            className="drawer-delete-account-link"
+            onClick={onClose}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              fontSize: '12px',
+              color: '#94a3b8',
+              marginBottom: '12px',
+              textDecoration: 'none',
+              padding: '6px 8px',
+              borderRadius: '6px',
+              transition: 'color 0.2s'
+            }}
+          >
+            <Trash2 size={14} />
+            <span>Request Account & Data Deletion</span>
+          </Link>
           <button type="button" className="drawer-logout-btn" onClick={onLogout}>
             <LogOut size={16} />
             <span>Sign Out</span>
@@ -4637,6 +4957,9 @@ function App() {
         <Route path="/admin/login" element={<Login defaultRole="admin" />} />
         <Route path="/admin-login" element={<Login defaultRole="admin" />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/delete-account" element={<DeleteAccount />} />
+        <Route path="/account-deletion" element={<DeleteAccount />} />
+        <Route path="/partner/delete-account" element={<DeleteAccount />} />
         <Route path="/forgot-password" element={<Navigate to="/login" replace />} />
         <Route path="/admin/forgot-password" element={<Navigate to="/admin/login" replace />} />
         <Route path="/partner/forgot-password" element={<Navigate to="/login" replace />} />
