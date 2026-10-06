@@ -40,4 +40,7 @@ local.properties
 # Database Backups & Dumps
 backups/
 *.sql
+!database/schema.sql
+!**/schema.sql
 scratch/
+

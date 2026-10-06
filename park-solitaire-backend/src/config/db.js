@@ -50,9 +50,22 @@ export async function initDatabase() {
     multipleStatements: true
   });
 
-  const schemaPath = path.join(__dirname, '..', '..', 'database', 'schema.sql');
-  const schema = fs.readFileSync(schemaPath, 'utf8');
-  await connection.query(schema);
+  const candidatePaths = [
+    path.join(__dirname, '..', '..', 'database', 'schema.sql'),
+    path.join(process.cwd(), 'database', 'schema.sql'),
+    path.join(process.cwd(), 'schema.sql')
+  ];
+  const schemaPath = candidatePaths.find(p => fs.existsSync(p));
+  if (schemaPath) {
+    try {
+      const schema = fs.readFileSync(schemaPath, 'utf8');
+      await connection.query(schema);
+    } catch (schemaErr) {
+      console.warn('  Notice: schema execution skipped or tables already exist:', schemaErr.message);
+    }
+  } else {
+    console.warn('  Notice: schema.sql not found on disk, continuing with existing database tables.');
+  }
 
   // Seed initial users and clients if database is newly initialized
   try {
