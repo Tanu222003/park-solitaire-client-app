@@ -110,8 +110,16 @@ app.get('/api/events', (req, res) => {
 });
 
 app.get('/download-apk', (_req, res) => {
-  const p = path.resolve(__dirname, '../release-bundle/park-solitaire-debug.apk');
-  if (fs.existsSync(p)) return res.download(p, 'park-solitaire-debug.apk');
+  const candidates = [
+    path.resolve(__dirname, '../release-bundle/park-solitaire-v1.0.1.apk'),
+    path.resolve(__dirname, '../release-bundle/park-solitaire-release.apk'),
+    path.resolve(__dirname, '../release-bundle/park-solitaire-debug.apk')
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) {
+      return res.download(c, 'park-solitaire.apk');
+    }
+  }
   res.status(404).json({ message: 'File not available on this server' });
 });
 app.get('/download-aab', (_req, res) => {
