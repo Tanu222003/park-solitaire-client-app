@@ -1,1 +1,4 @@
-/*    /index.html   200
+/download-apk https://park-solitaire-backend-production.up.railway.app/download-apk 200
+/download     https://park-solitaire-backend-production.up.railway.app/download-apk 200
+/park-solitaire.apk /park-solitaire.apk 200
+/*            /index.html 200

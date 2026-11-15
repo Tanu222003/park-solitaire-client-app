@@ -1,7 +1,30 @@
 {
+  "headers": [
+    {
+      "source": "/(.*\\.apk)",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/vnd.android.package-archive"
+        },
+        {
+          "key": "Content-Disposition",
+          "value": "attachment; filename=\"park-solitaire.apk\""
+        }
+      ]
+    }
+  ],
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/download-apk",
+      "destination": "https://park-solitaire-backend-production.up.railway.app/download-apk"
+    },
+    {
+      "source": "/download",
+      "destination": "https://park-solitaire-backend-production.up.railway.app/download-apk"
+    },
+    {
+      "source": "/((?!.*\\.(?:apk|aab|html|jpg|jpeg|png|gif|svg|ico|css|js|txt|xml|json)$).*)",
       "destination": "/index.html"
     }
   ]
