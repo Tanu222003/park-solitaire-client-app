@@ -39,12 +39,16 @@
   ],
   "rewrites": [
     {
-      "source": "/download-apk",
-      "destination": "https://park-solitaire-backend-production.up.railway.app/download-apk"
+      "source": "/download",
+      "destination": "/download.html"
     },
     {
-      "source": "/download",
-      "destination": "https://park-solitaire-backend-production.up.railway.app/download-apk"
+      "source": "/download-apk",
+      "destination": "/download.html"
+    },
+    {
+      "source": "/delete-account",
+      "destination": "/delete-account.html"
     },
     {
       "source": "/((?!.*\\.(?:apk|aab|html|jpg|jpeg|png|gif|svg|ico|css|js|txt|xml|json)$).*)",

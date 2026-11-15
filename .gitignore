@@ -37,6 +37,14 @@ build/
 local.properties
 **/local.properties
 .vercel
+# Large downloads / temp apks (ignore general builds, track only official 5MB release APK)
+downloads/*
+**/downloads/*
+*.apk
+*.aab
+!park-solitaire-frontend/public/park-solitaire.apk
+!park-solitaire-backend/downloads/park-solitaire.apk
+
 # Database Backups & Dumps
 backups/
 *.sql
