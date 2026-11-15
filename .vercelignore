@@ -7,8 +7,8 @@
 **/build
 *.jks
 *.aab
-*.apk
 *.zip
 .git
 release-bundle
 park-solitaire-backend
+!park-solitaire-frontend/public/park-solitaire.apk

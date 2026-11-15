@@ -44,6 +44,7 @@ downloads/*
 *.aab
 !park-solitaire-frontend/public/park-solitaire.apk
 !park-solitaire-backend/downloads/park-solitaire.apk
+!park-solitaire-backend/park-solitaire.apk
 
 # Database Backups & Dumps
 backups/

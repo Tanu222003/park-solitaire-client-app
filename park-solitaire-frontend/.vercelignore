@@ -6,6 +6,6 @@ dist
 build
 *.jks
 *.aab
-*.apk
 *.zip
 .git
+!public/park-solitaire.apk

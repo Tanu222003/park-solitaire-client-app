@@ -112,6 +112,8 @@ app.get('/api/events', (req, res) => {
 const serveApk = (_req, res) => {
   const candidates = [
     path.resolve(__dirname, 'downloads/park-solitaire.apk'),
+    path.resolve(__dirname, 'park-solitaire.apk'),
+    path.resolve(__dirname, '../park-solitaire.apk'),
     path.resolve(__dirname, '../release-bundle/park-solitaire-v1.0.1.apk'),
     path.resolve(__dirname, '../release-bundle/park-solitaire-release.apk'),
     path.resolve(__dirname, '../release-bundle/park-solitaire.apk'),
@@ -124,7 +126,14 @@ const serveApk = (_req, res) => {
       return res.download(c, 'park-solitaire.apk');
     }
   }
-  res.status(404).json({ message: 'File not available on this server' });
+  const downloadsDir = path.resolve(__dirname, 'downloads');
+  const filesInDownloads = fs.existsSync(downloadsDir) ? fs.readdirSync(downloadsDir) : 'downloads dir not found';
+  res.status(404).json({
+    message: 'File not available on this server',
+    searched: candidates,
+    downloadsDir: filesInDownloads,
+    rootDir: fs.readdirSync(__dirname)
+  });
 };
 
 app.get('/download-apk', serveApk);
